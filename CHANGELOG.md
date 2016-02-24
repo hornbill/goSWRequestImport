@@ -1,4 +1,4 @@
-## 1.0.1 (February 24th, 2016)
+## 1.0.2 (February 24th, 2016)
 
 Defect Fixes:
 
