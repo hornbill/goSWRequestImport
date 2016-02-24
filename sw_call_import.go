@@ -352,13 +352,13 @@ func main() {
 	arrSWStatus["1"] = "status.open"
 	arrSWStatus["2"] = "status.open"
 	arrSWStatus["3"] = "status.open"
-	arrSWStatus["4"] = "status.onHold"
+	arrSWStatus["4"] = "status.open"
 	arrSWStatus["5"] = "status.offHold"
 	arrSWStatus["6"] = "status.resolved"
-	arrSWStatus["8"] = "status.incoming"
-	arrSWStatus["9"] = "status.escalated"
-	arrSWStatus["10"] = "status.escalated"
-	arrSWStatus["11"] = "status.escalated"
+	arrSWStatus["8"] = "status.new"
+	arrSWStatus["9"] = "status.open"
+	arrSWStatus["10"] = "status.open"
+	arrSWStatus["11"] = "status.open"
 	arrSWStatus["16"] = "status.closed"
 	arrSWStatus["17"] = "status.cancelled"
 	arrSWStatus["18"] = "status.closed"
@@ -1079,7 +1079,7 @@ func logNewCall(callClass string, callMap map[string]interface{}, swCallID strin
 	//-- Get Service ID
 	strServiceID := getCallServiceID(callMap)
 	if strServiceID == "" && mapGenericConf.DefaultService != "" {
-		strServiceID = getTeamID(mapGenericConf.DefaultService)
+		strServiceID = getServiceID(mapGenericConf.DefaultService)
 	}
 	//-- Get Summary Text
 	strSummary := ""
