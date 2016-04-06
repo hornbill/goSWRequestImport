@@ -1,3 +1,9 @@
+## 1.1.0 (April 4th, 2016)
+
+Features:
+
+  - Improved import performance using Goroutines & parallel processing of request logging
+
 ## 1.0.2 (February 24th, 2016)
 
 Defect Fixes:

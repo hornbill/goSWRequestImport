@@ -19,18 +19,20 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 )
 
 const (
-	version           = 1.0
+	version           = 1.1
 	appServiceManager = "com.hornbill.servicemanager"
 	//Disk Space Declarations
-	sizeKB float64 = 1 << (10 * 1)
-	sizeMB float64 = 1 << (10 * 2)
-	sizeGB float64 = 1 << (10 * 3)
-	sizeTB float64 = 1 << (10 * 4)
-	sizePB float64 = 1 << (10 * 5)
+	sizeKB        float64 = 1 << (10 * 1)
+	sizeMB        float64 = 1 << (10 * 2)
+	sizeGB        float64 = 1 << (10 * 3)
+	sizeTB        float64 = 1 << (10 * 4)
+	sizePB        float64 = 1 << (10 * 5)
+	maxGoroutines int     = 5
 )
 
 var (
@@ -65,6 +67,9 @@ var (
 	endTime             time.Duration
 	espXmlmc            *apiLib.XmlmcInstStruct
 	xmlmcInstanceConfig xmlmcConfigStruct
+	mutex               = &sync.Mutex{}
+	wg                  sync.WaitGroup
+	wg2                 sync.WaitGroup
 )
 
 // ----- Structures -----
@@ -953,18 +958,33 @@ func processCallData() bool {
 	if queryDBCallDetails(mapGenericConf.CallClass, connStrAppDB) == true {
 		bar := pb.StartNew(len(arrCallDetailsMaps))
 		//We have Call Details - insert them in to
+		fmt.Println("Go Routines", maxGoroutines)
+		maxGoroutinesGaurd := make(chan struct{}, maxGoroutines)
 		for _, callRecord := range arrCallDetailsMaps {
-			bar.Increment()
-			callID := fmt.Sprintf("%s", callRecord["callref"])
-			currentCallRef = padCallRef(callID, "F", 7)
-			boolCallLogged, hbCallRef := logNewCall(mapGenericConf.CallClass, callRecord, callID)
-			if boolCallLogged {
-				logger(3, "[REQUEST LOGGED] Request logged successfully: "+hbCallRef+" from Supportworks call "+currentCallRef, false)
-				boolCallDataSuccess = true
-			} else {
-				logger(4, mapGenericConf.CallClass+" call log failed: "+currentCallRef, false)
-			}
+			maxGoroutinesGaurd <- struct{}{}
+			wg2.Add(1)
+			arrCallRecord := callRecord
+			callRecordCallref := callRecord["callref"]
+			go func() {
+				defer wg2.Done()
+				time.Sleep(1 * time.Millisecond)
+				mutex.Lock()
+				bar.Increment()
+				mutex.Unlock()
+				callID := fmt.Sprintf("%s", callRecordCallref)
+				currentCallRef = padCallRef(callID, "F", 7)
+				boolCallLogged, hbCallRef := logNewCall(mapGenericConf.CallClass, arrCallRecord, callID)
+				if boolCallLogged {
+					logger(3, "[REQUEST LOGGED] Request logged successfully: "+hbCallRef+" from Supportworks call "+currentCallRef, false)
+					boolCallDataSuccess = true
+				} else {
+					logger(4, mapGenericConf.CallClass+" call log failed: "+currentCallRef, false)
+				}
+				<-maxGoroutinesGaurd
+			}()
 		}
+		wg2.Wait()
+
 		bar.FinishPrint(mapGenericConf.CallClass + " Call Import Complete")
 	} else {
 		logger(4, "Call Search Failed for Call Class: "+mapGenericConf.CallClass, true)
@@ -975,28 +995,44 @@ func processCallData() bool {
 //processClosedCalls - closes all relevant requests when logging process complete
 // - This is to ensure that closed calls have file attachments associated, which cannot be done at point of logging
 func processClosedCalls() {
+
+	fmt.Println("Go Routines", maxGoroutines)
+	maxGoroutinesGaurd := make(chan struct{}, maxGoroutines)
+
 	for callref := range arrClosedCalls {
-		currSMFileCallRef, importedCallToClose := arrCallsLogged[callref]
-		if importedCallToClose == true {
-			//Close the current call!
-			espXmlmc.SetParam("requestID", currSMFileCallRef)
-			XMLClose, xmlmcErr := espXmlmc.Invoke("apps/"+appServiceManager+"/Requests", "closeRequest")
-			if xmlmcErr != nil {
-				log.Fatal(xmlmcErr)
-				return
+		maxGoroutinesGaurd <- struct{}{}
+		wg.Add(1)
+		callrefLocal := callref
+		go func() {
+			defer wg.Done()
+			currSMFileCallRef, importedCallToClose := arrCallsLogged[callrefLocal]
+			if importedCallToClose == true {
+				//Close the current call!
+				espXmlmc.SetParam("requestID", currSMFileCallRef)
+				XMLClose, xmlmcErr := espXmlmc.Invoke("apps/"+appServiceManager+"/Requests", "closeRequest")
+				if xmlmcErr != nil {
+					log.Fatal(xmlmcErr)
+					<-maxGoroutinesGaurd
+					return
+				}
+				var xmlRespon xmlmcResponse
+				err := xml.Unmarshal([]byte(XMLClose), &xmlRespon)
+				if err != nil {
+					logger(4, "Unable to read response from Hornbill instance to close request "+currSMFileCallRef+":"+fmt.Sprintf("%v", err), false)
+					<-maxGoroutinesGaurd
+					return
+				}
+				if xmlRespon.MethodResult != "ok" {
+					logger(4, "Unable to close request "+currSMFileCallRef+": "+xmlRespon.State.ErrorRet, false)
+					<-maxGoroutinesGaurd
+					return
+				}
 			}
-			var xmlRespon xmlmcResponse
-			err := xml.Unmarshal([]byte(XMLClose), &xmlRespon)
-			if err != nil {
-				logger(4, "Unable to read response from Hornbill instance to close request "+currSMFileCallRef+":"+fmt.Sprintf("%v", err), false)
-				return
-			}
-			if xmlRespon.MethodResult != "ok" {
-				logger(4, "Unable to close request "+currSMFileCallRef+": "+xmlRespon.State.ErrorRet, false)
-				return
-			}
-		}
+
+			<-maxGoroutinesGaurd
+		}()
 	}
+	wg.Wait()
 	return
 }
 
@@ -1048,6 +1084,12 @@ func queryDBCallDetails(callClass, connString string) bool {
 
 //logNewCall - Function takes Supportworks call data in a map, and logs to Hornbill
 func logNewCall(callClass string, callMap map[string]interface{}, swCallID string) (bool, string) {
+	espXmlmc, err := NewEspXmlmcSession()
+	if err != nil {
+		return false, "Unable to create Session"
+	}
+
+	defer EspXmlmcSessionDestroy(espXmlmc)
 	boolCallLoggedOK := false
 	boolAssignToDefault := false
 	strNewCallRef := ""
@@ -1249,7 +1291,11 @@ func updateExtraRequestCols(newCallRef string, callMap map[string]interface{}) b
 	boolUpdateRequest := false
 	strAttribute := ""
 	strMapping := ""
-
+	espXmlmc, err := NewEspXmlmcSession()
+	if err != nil {
+		return false
+	}
+	defer EspXmlmcSessionDestroy(espXmlmc)
 	espXmlmc.SetParam("application", appServiceManager)
 	espXmlmc.SetParam("entity", "Requests")
 	espXmlmc.OpenElement("primaryEntityData")
@@ -1284,7 +1330,7 @@ func updateExtraRequestCols(newCallRef string, callMap map[string]interface{}) b
 	}
 	var xmlRespon xmlmcResponse
 
-	err := xml.Unmarshal([]byte(XMLCreate), &xmlRespon)
+	err = xml.Unmarshal([]byte(XMLCreate), &xmlRespon)
 	if err != nil {
 		logger(4, "Unable to read response from Hornbill instance:"+fmt.Sprintf("%v", err), false)
 		return false
@@ -1298,6 +1344,11 @@ func updateExtraRequestCols(newCallRef string, callMap map[string]interface{}) b
 
 //applyHistoricalUpdates - takes call diary records from Supportworks, imports to Hornbill as Historical Updates
 func applyHistoricalUpdates(newCallRef, swCallRef string) bool {
+	espXmlmc, err := NewEspXmlmcSession()
+	if err != nil {
+		return false
+	}
+	defer EspXmlmcSessionDestroy(espXmlmc)
 	//Connect to the JSON specified DB
 	db, err := sqlx.Open(appDBDriver, connStrAppDB)
 	defer db.Close()
@@ -1409,6 +1460,11 @@ func applyHistoricalUpdates(newCallRef, swCallRef string) bool {
 
 //assignCall - takes Service Manager call ref, team and analyst, and assigns call accordingly
 func assignCall(newCallRef, analystID, teamID string, boolDefaultAssign bool) (boolCallAssigned bool) {
+	espXmlmc, err := NewEspXmlmcSession()
+	if err != nil {
+		return false
+	}
+	defer EspXmlmcSessionDestroy(espXmlmc)
 	boolDoesOwnerExist := false
 	if analystID != "" && boolDefaultAssign == false {
 		boolDoesOwnerExist = doesOwnerExist(analystID)
@@ -1424,7 +1480,7 @@ func assignCall(newCallRef, analystID, teamID string, boolDefaultAssign bool) (b
 		return
 	}
 	var xmlRespon xmlmcResponse
-	err := xml.Unmarshal([]byte(XMLCreate), &xmlRespon)
+	err = xml.Unmarshal([]byte(XMLCreate), &xmlRespon)
 	if err != nil {
 		logger(4, "Unable to read response from Hornbill instance:"+fmt.Sprintf("%v", err), false)
 		return
@@ -1439,6 +1495,11 @@ func assignCall(newCallRef, analystID, teamID string, boolDefaultAssign bool) (b
 
 //setPriority - takes Service Manager call ref and Priority ID, and Prioritises call accordingly
 func setPriority(newCallRef, priorityID, priorityName string) (boolPrioritised bool) {
+	espXmlmc, err := NewEspXmlmcSession()
+	if err != nil {
+		return false
+	}
+	defer EspXmlmcSessionDestroy(espXmlmc)
 	espXmlmc.SetParam("requestId", newCallRef)
 	espXmlmc.SetParam("priorityId", priorityID)
 	espXmlmc.SetParam("priorityName", priorityName)
@@ -1449,7 +1510,7 @@ func setPriority(newCallRef, priorityID, priorityName string) (boolPrioritised b
 		return
 	}
 	var xmlRespon xmlmcResponse
-	err := xml.Unmarshal([]byte(XMLCreate), &xmlRespon)
+	err = xml.Unmarshal([]byte(XMLCreate), &xmlRespon)
 	if err != nil {
 		logger(4, "Unable to read response from Hornbill instance:"+fmt.Sprintf("%v", err), false)
 		return
@@ -1663,6 +1724,12 @@ func getCategoryID(categoryCode, categoryGroup string) string {
 
 //doesOwnerExist takes an Analyst ID string and returns a true if one exists in the cache or on the Instance
 func doesOwnerExist(analystID string) bool {
+	espXmlmc, err := NewEspXmlmcSession()
+	if err != nil {
+		return false
+	}
+	defer EspXmlmcSessionDestroy(espXmlmc)
+
 	boolOwnerExists := false
 	if analystID != "" {
 		analystIsInCache, _ := recordInCache(analystID, "Analyst")
@@ -1778,6 +1845,12 @@ func recordInCache(recordName, recordType string) (bool, string) {
 
 // seachSite -- Function to check if passed-through  site  name is on the instance
 func searchSite(siteName string) (bool, int) {
+	espXmlmc, err := NewEspXmlmcSession()
+	if err != nil {
+		return false, 0
+	}
+	defer EspXmlmcSessionDestroy(espXmlmc)
+
 	boolReturn := false
 	intReturn := 0
 	//-- ESP Query for site
@@ -1795,7 +1868,7 @@ func searchSite(siteName string) (bool, int) {
 	}
 	var xmlRespon xmlmcSiteListResponse
 
-	err := xml.Unmarshal([]byte(XMLSiteSearch), &xmlRespon)
+	err = xml.Unmarshal([]byte(XMLSiteSearch), &xmlRespon)
 	if err != nil {
 		logger(5, "Unable to Search for Site: "+fmt.Sprintf("%v", err), false)
 	} else {
@@ -1825,6 +1898,11 @@ func searchPriority(priorityName string) (bool, int) {
 	boolReturn := false
 	intReturn := 0
 	//-- ESP Query for Priority
+	espXmlmc, err := NewEspXmlmcSession()
+	if err != nil {
+		return false, 0
+	}
+	defer EspXmlmcSessionDestroy(espXmlmc)
 	espXmlmc.SetParam("application", appServiceManager)
 	espXmlmc.SetParam("entity", "Priority")
 	espXmlmc.SetParam("matchScope", "all")
@@ -1840,7 +1918,7 @@ func searchPriority(priorityName string) (bool, int) {
 	}
 	var xmlRespon xmlmcPriorityListResponse
 
-	err := xml.Unmarshal([]byte(XMLPrioritySearch), &xmlRespon)
+	err = xml.Unmarshal([]byte(XMLPrioritySearch), &xmlRespon)
 	if err != nil {
 		logger(5, "Unable to Search for Priority: "+fmt.Sprintf("%v", err), false)
 	} else {
@@ -1869,6 +1947,11 @@ func searchPriority(priorityName string) (bool, int) {
 func searchService(serviceName string) (bool, int) {
 	boolReturn := false
 	intReturn := 0
+	espXmlmc, err := NewEspXmlmcSession()
+	if err != nil {
+		return false, 0
+	}
+	defer EspXmlmcSessionDestroy(espXmlmc)
 	//-- ESP Query for service
 	espXmlmc.SetParam("application", appServiceManager)
 	espXmlmc.SetParam("entity", "Services")
@@ -1885,7 +1968,7 @@ func searchService(serviceName string) (bool, int) {
 	}
 	var xmlRespon xmlmcServiceListResponse
 
-	err := xml.Unmarshal([]byte(XMLServiceSearch), &xmlRespon)
+	err = xml.Unmarshal([]byte(XMLServiceSearch), &xmlRespon)
 	if err != nil {
 		logger(5, "Unable to Search for Service: "+fmt.Sprintf("%v", err), false)
 	} else {
@@ -1915,6 +1998,14 @@ func searchTeam(teamName string) (bool, string) {
 	boolReturn := false
 	strReturn := ""
 	//-- ESP Query for team
+	espXmlmc, err := NewEspXmlmcSession()
+	if err != nil {
+		return false, "Unable to create connection"
+	}
+	defer EspXmlmcSessionDestroy(espXmlmc)
+	espXmlmc.SetParam("userId", swImportConf.HBConf.UserName)
+	espXmlmc.SetParam("password", base64.StdEncoding.EncodeToString([]byte(swImportConf.HBConf.Password)))
+	espXmlmc.Invoke("session", "userLogon")
 	espXmlmc.SetParam("entity", "Groups")
 	espXmlmc.SetParam("matchScope", "all")
 	espXmlmc.OpenElement("searchFilter")
@@ -1929,7 +2020,7 @@ func searchTeam(teamName string) (bool, string) {
 	}
 	var xmlRespon xmlmcTeamListResponse
 
-	err := xml.Unmarshal([]byte(XMLTeamSearch), &xmlRespon)
+	err = xml.Unmarshal([]byte(XMLTeamSearch), &xmlRespon)
 	if err != nil {
 		logger(5, "Unable to Search for Team: "+fmt.Sprintf("%v", err), true)
 	} else {
@@ -1956,6 +2047,11 @@ func searchTeam(teamName string) (bool, string) {
 
 // seachCategory -- Function to check if passed-through support category name is on the instance
 func searchCategory(categoryCode, categoryGroup string) (bool, string) {
+	espXmlmc, err := NewEspXmlmcSession()
+	if err != nil {
+		return false, "Unable to create connection"
+	}
+	defer EspXmlmcSessionDestroy(espXmlmc)
 	boolReturn := false
 	strReturn := ""
 	//-- ESP Query for category
@@ -1969,7 +2065,7 @@ func searchCategory(categoryCode, categoryGroup string) (bool, string) {
 	}
 	var xmlRespon xmlmcCategoryListResponse
 
-	err := xml.Unmarshal([]byte(XMLCategorySearch), &xmlRespon)
+	err = xml.Unmarshal([]byte(XMLCategorySearch), &xmlRespon)
 	if err != nil {
 		logger(5, "Unable to Search for "+categoryGroup+" Category: "+fmt.Sprintf("%v", err), false)
 	} else {
@@ -2185,6 +2281,7 @@ func logger(t int, s string, outputtoCLI bool) {
 
 // espLogger -- Log to ESP
 func espLogger(message string, severity string) {
+
 	espXmlmc.SetParam("fileName", "SW_Call_Import")
 	espXmlmc.SetParam("group", "general")
 	espXmlmc.SetParam("severity", severity)
@@ -2230,4 +2327,21 @@ func epochToDateTime(epochDateString string) string {
 		}
 	}
 	return dateTime
+}
+
+//NewEspXmlmcSession - Creates new XMLMC Session for seperate instance initialisation
+func NewEspXmlmcSession() (*apiLib.XmlmcInstStruct, error) {
+	espXmlmcLocal := apiLib.NewXmlmcInstance(swImportConf.HBConf.URL)
+	espXmlmcLocal.SetParam("userId", swImportConf.HBConf.UserName)
+	espXmlmcLocal.SetParam("password", base64.StdEncoding.EncodeToString([]byte(swImportConf.HBConf.Password)))
+	_, returncode := espXmlmcLocal.Invoke("session", "userLogon")
+
+	return espXmlmcLocal, returncode
+}
+
+//EspXmlmcSessionDestroy - ends a given XMLMC session
+func EspXmlmcSessionDestroy(XMLMCSession *apiLib.XmlmcInstStruct) {
+
+	XMLMCSession.Invoke("session", "userLogoff")
+
 }
