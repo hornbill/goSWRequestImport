@@ -1,3 +1,10 @@
+## 1.1.1 (April 7th, 2016)
+
+Features:
+
+  - Added additional stage in file attachment import user confirmation;
+  - Enhanced notification display using color in CLI output
+
 ## 1.1.0 (April 7th, 2016)
 
 Features:

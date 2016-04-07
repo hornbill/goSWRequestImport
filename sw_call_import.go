@@ -7,6 +7,7 @@ import (
 	"encoding/xml"
 	"flag"
 	"fmt"
+	"github.com/hornbill/color"
 	_ "github.com/hornbill/go-mssqldb" //Microsoft SQL Server driver - v2005+
 	"github.com/hornbill/goApiLib"
 	_ "github.com/hornbill/mysql"    //MySQL v4.1 to v5.x and MariaDB driver
@@ -545,14 +546,23 @@ func processFileAttachments() {
 	//intStorageRequired := int64(fltStorageRequired)
 	strStorageRequired := convFloattoSizeStr(fltStorageRequired)
 
-	logger(3, " ------------ File Attachment Processing ------------", true)
-	logger(3, " Approximately "+strStorageRequired+" of storage space is required to import your", true)
-	logger(3, " Request File Attachments.", true)
-	logger(3, " You have approximately "+strStorageAvailable+" available space, from your subscribed", true)
-	logger(3, " amount of "+strStorageTotal+".", true)
+	logger(6, "\n ------------ File Attachment Processing ------------", true)
+	logger(6, " Approximately "+strStorageRequired+" of storage space is required to import your", true)
+	logger(6, " Request File Attachments.", true)
+	logger(6, " You have approximately "+strStorageAvailable+" available space, from your subscribed", true)
+	logger(6, " amount of "+strStorageTotal+".", true)
 	fmt.Printf(" Do you want to import your Supportworks Call File Attachments\n in to your Service Manager Requests (yes/no): ")
 
-	if confirmResponse() == true {
+	boolProcessAttachments := false
+	if confirmResponse() == false {
+		color.Red(" If you do not import file attachments at this stage, you will NOT\n be able to import them in the future!")
+		color.Red("\n Please confirm your response one more time.")
+		fmt.Printf("\n Do you want to import your Supportworks Call File Attachments\n in to your Service Manager Requests (yes/no): ")
+		boolProcessAttachments = confirmResponse()
+	} else {
+		boolProcessAttachments = true
+	}
+	if boolProcessAttachments == true {
 		//Iterate through File Attachment records again for processing
 		logger(3, " Processing attachments for "+fmt.Sprintf("%v", len(callLevel))+" requests...", true)
 		bar := pb.StartNew(len(callLevel))
@@ -638,16 +648,16 @@ func decodeSWMFile(fileEncoded string) (string, string) {
 	var xmlResponEmail xmlmcEmailAttachmentResponse
 	errUnmarshall := xml.Unmarshal([]byte(XMLEmailDecoded), &xmlResponEmail)
 	if errUnmarshall != nil {
-		logger(4, "Unable to read XML response from Message Decode: "+fmt.Sprintf("%v", errUnmarshall), false)
+		logger(5, "Unable to read XML response from Message Decode: "+fmt.Sprintf("%v", errUnmarshall), false)
 		return emailContent, subjectLine
 	}
 	if xmlResponEmail.MethodResult != "ok" {
-		logger(4, "Error returned from API for Message Decode: "+fmt.Sprintf("%v", xmlResponEmail.MethodResult), false)
+		logger(5, "Error returned from API for Message Decode: "+fmt.Sprintf("%v", xmlResponEmail.MethodResult), false)
 		return emailContent, subjectLine
 	}
 
 	if xmlResponEmail.Params.Recipients == nil {
-		logger(4, "No recipients found in mail message.", false)
+		logger(5, "No recipients found in mail message.", false)
 		return emailContent, subjectLine
 	}
 
@@ -739,7 +749,7 @@ func addFileContent(smCallRef, entityName, fileName string, fileRecord fileAssoc
 	espXmlmc.SetParam("overwrite", "true")
 	XMLAttach, xmlmcErr := espXmlmc.Invoke("data", "entityAttachFile")
 	if xmlmcErr != nil {
-		logger(5, "Could not add Attachment File Data: "+fmt.Sprintf("%v", xmlmcErr), false)
+		logger(4, "Could not add Attachment File Data: "+fmt.Sprintf("%v", xmlmcErr), false)
 		log.Fatal(xmlmcErr)
 		return false
 	}
@@ -747,10 +757,10 @@ func addFileContent(smCallRef, entityName, fileName string, fileRecord fileAssoc
 
 	err := xml.Unmarshal([]byte(XMLAttach), &xmlRespon)
 	if err != nil {
-		logger(5, "Could not add Attachment File Data: "+fmt.Sprintf("%v", err), false)
+		logger(4, "Could not add Attachment File Data: "+fmt.Sprintf("%v", err), false)
 	} else {
 		if xmlRespon.MethodResult != "ok" {
-			logger(5, "Could not add Attachment File Data: "+xmlRespon.State.ErrorRet, false)
+			logger(4, "Could not add Attachment File Data: "+xmlRespon.State.ErrorRet, false)
 		} else {
 			//-- If we've got a Content Location back from the API, update the file record with this
 			if xmlRespon.Params.ContentLocation != "" {
@@ -823,7 +833,7 @@ func confirmResponse() bool {
 	} else if cmdResponse == "n" || cmdResponse == "no" || cmdResponse == "N" || cmdResponse == "No" || cmdResponse == "NO" {
 		return false
 	} else {
-		fmt.Println("Please enter yes or no to continue:")
+		color.Red("Please enter yes or no to continue:")
 		return confirmResponse()
 	}
 }
@@ -855,17 +865,17 @@ func getInstanceFreeSpace() (int64, int64, string, string) {
 
 	XMLAudit, xmlmcErr := espXmlmc.Invoke("admin", "getInstanceAuditInfo")
 	if xmlmcErr != nil {
-		logger(5, "Could not return Instance Audit Information: "+fmt.Sprintf("%v", xmlmcErr), false)
+		logger(4, "Could not return Instance Audit Information: "+fmt.Sprintf("%v", xmlmcErr), false)
 		log.Fatal(xmlmcErr)
 	}
 	var xmlRespon xmlmcAuditListResponse
 
 	err := xml.Unmarshal([]byte(XMLAudit), &xmlRespon)
 	if err != nil {
-		logger(5, "Could not return Instance Audit Information: "+fmt.Sprintf("%v", err), false)
+		logger(4, "Could not return Instance Audit Information: "+fmt.Sprintf("%v", err), false)
 	} else {
 		if xmlRespon.MethodResult != "ok" {
-			logger(5, "Could not return Instance Audit Information: "+xmlRespon.State.ErrorRet, false)
+			logger(4, "Could not return Instance Audit Information: "+xmlRespon.State.ErrorRet, false)
 		} else {
 			//-- Check Response
 			if xmlRespon.Params.TotalStorage > 0 && xmlRespon.Params.TotalStorageUsed > 0 {
@@ -1500,7 +1510,7 @@ func assignCall(newCallRef, analystID, teamID string, boolDefaultAssign bool) (b
 		return
 	}
 	if xmlRespon.MethodResult != "ok" {
-		logger(5, "Unable to assign request: "+xmlRespon.State.ErrorRet, false)
+		logger(4, "Unable to assign request: "+xmlRespon.State.ErrorRet, false)
 	} else {
 		boolCallAssigned = true
 	}
@@ -1530,7 +1540,7 @@ func setPriority(newCallRef, priorityID, priorityName string) (boolPrioritised b
 		return
 	}
 	if xmlRespon.MethodResult != "ok" {
-		logger(5, "Unable to prioritise request: "+xmlRespon.State.ErrorRet, false)
+		logger(4, "Unable to prioritise request: "+xmlRespon.State.ErrorRet, false)
 	} else {
 		boolPrioritised = true
 	}
@@ -1543,7 +1553,7 @@ func getFieldValue(v string, u map[string]interface{}) string {
 	//-- Match $variable from String
 	re1, err := regexp.Compile(`\[(.*?)\]`)
 	if err != nil {
-		fmt.Printf("[ERROR] %v", err)
+		color.Red("[ERROR] %v", err)
 	}
 
 	result := re1.FindAllString(fieldMap, 100)
@@ -1762,17 +1772,17 @@ func doesOwnerExist(analystID string) bool {
 
 			XMLAnalystSearch, xmlmcErr := espXmlmc.Invoke("data", "entityBrowseRecords")
 			if xmlmcErr != nil {
-				logger(5, "Unable to Search for Owner: "+fmt.Sprintf("%v", xmlmcErr), true)
+				logger(4, "Unable to Search for Owner: "+fmt.Sprintf("%v", xmlmcErr), true)
 				log.Fatal(xmlmcErr)
 			}
 			var xmlRespon xmlmcAnalystListResponse
 
 			err := xml.Unmarshal([]byte(XMLAnalystSearch), &xmlRespon)
 			if err != nil {
-				logger(5, "Unable to Search for Owner: "+fmt.Sprintf("%v", err), true)
+				logger(4, "Unable to Search for Owner: "+fmt.Sprintf("%v", err), true)
 			} else {
 				if xmlRespon.MethodResult != "ok" {
-					logger(5, "Unable to Search for Owner: "+xmlRespon.State.ErrorRet, true)
+					logger(4, "Unable to Search for Owner: "+xmlRespon.State.ErrorRet, true)
 				} else {
 					//-- Check Response
 					if xmlRespon.Params.RowData.Row.AnalystName != "" {
@@ -1877,17 +1887,17 @@ func searchSite(siteName string) (bool, int) {
 
 	XMLSiteSearch, xmlmcErr := espXmlmc.Invoke("data", "entityBrowseRecords")
 	if xmlmcErr != nil {
-		logger(5, "Unable to Search for Site: "+fmt.Sprintf("%v", xmlmcErr), false)
+		logger(4, "Unable to Search for Site: "+fmt.Sprintf("%v", xmlmcErr), false)
 		log.Fatal(xmlmcErr)
 	}
 	var xmlRespon xmlmcSiteListResponse
 
 	err = xml.Unmarshal([]byte(XMLSiteSearch), &xmlRespon)
 	if err != nil {
-		logger(5, "Unable to Search for Site: "+fmt.Sprintf("%v", err), false)
+		logger(4, "Unable to Search for Site: "+fmt.Sprintf("%v", err), false)
 	} else {
 		if xmlRespon.MethodResult != "ok" {
-			logger(5, "Unable to Search for Site: "+xmlRespon.State.ErrorRet, false)
+			logger(4, "Unable to Search for Site: "+xmlRespon.State.ErrorRet, false)
 		} else {
 			//-- Check Response
 			if xmlRespon.Params.RowData.Row.SiteName != "" {
@@ -1927,17 +1937,17 @@ func searchPriority(priorityName string) (bool, int) {
 
 	XMLPrioritySearch, xmlmcErr := espXmlmc.Invoke("data", "entityBrowseRecords")
 	if xmlmcErr != nil {
-		logger(5, "Unable to Search for Priority: "+fmt.Sprintf("%v", xmlmcErr), false)
+		logger(4, "Unable to Search for Priority: "+fmt.Sprintf("%v", xmlmcErr), false)
 		log.Fatal(xmlmcErr)
 	}
 	var xmlRespon xmlmcPriorityListResponse
 
 	err = xml.Unmarshal([]byte(XMLPrioritySearch), &xmlRespon)
 	if err != nil {
-		logger(5, "Unable to Search for Priority: "+fmt.Sprintf("%v", err), false)
+		logger(4, "Unable to Search for Priority: "+fmt.Sprintf("%v", err), false)
 	} else {
 		if xmlRespon.MethodResult != "ok" {
-			logger(5, "Unable to Search for Priority: "+xmlRespon.State.ErrorRet, false)
+			logger(4, "Unable to Search for Priority: "+xmlRespon.State.ErrorRet, false)
 		} else {
 			//-- Check Response
 			if xmlRespon.Params.RowData.Row.PriorityName != "" {
@@ -1977,17 +1987,17 @@ func searchService(serviceName string) (bool, int) {
 
 	XMLServiceSearch, xmlmcErr := espXmlmc.Invoke("data", "entityBrowseRecords")
 	if xmlmcErr != nil {
-		logger(5, "Unable to Search for Service: "+fmt.Sprintf("%v", xmlmcErr), false)
+		logger(4, "Unable to Search for Service: "+fmt.Sprintf("%v", xmlmcErr), false)
 		log.Fatal(xmlmcErr)
 	}
 	var xmlRespon xmlmcServiceListResponse
 
 	err = xml.Unmarshal([]byte(XMLServiceSearch), &xmlRespon)
 	if err != nil {
-		logger(5, "Unable to Search for Service: "+fmt.Sprintf("%v", err), false)
+		logger(4, "Unable to Search for Service: "+fmt.Sprintf("%v", err), false)
 	} else {
 		if xmlRespon.MethodResult != "ok" {
-			logger(5, "Unable to Search for Service: "+xmlRespon.State.ErrorRet, false)
+			logger(4, "Unable to Search for Service: "+xmlRespon.State.ErrorRet, false)
 		} else {
 			//-- Check Response
 			if xmlRespon.Params.RowData.Row.ServiceName != "" {
@@ -2029,17 +2039,17 @@ func searchTeam(teamName string) (bool, string) {
 
 	XMLTeamSearch, xmlmcErr := espXmlmc.Invoke("data", "entityBrowseRecords")
 	if xmlmcErr != nil {
-		logger(5, "Unable to Search for Team: "+fmt.Sprintf("%v", xmlmcErr), true)
+		logger(4, "Unable to Search for Team: "+fmt.Sprintf("%v", xmlmcErr), true)
 		log.Fatal(xmlmcErr)
 	}
 	var xmlRespon xmlmcTeamListResponse
 
 	err = xml.Unmarshal([]byte(XMLTeamSearch), &xmlRespon)
 	if err != nil {
-		logger(5, "Unable to Search for Team: "+fmt.Sprintf("%v", err), true)
+		logger(4, "Unable to Search for Team: "+fmt.Sprintf("%v", err), true)
 	} else {
 		if xmlRespon.MethodResult != "ok" {
-			logger(5, "Unable to Search for Team: "+xmlRespon.State.ErrorRet, true)
+			logger(4, "Unable to Search for Team: "+xmlRespon.State.ErrorRet, true)
 		} else {
 			//-- Check Response
 			if xmlRespon.Params.RowData.Row.TeamName != "" {
@@ -2074,17 +2084,17 @@ func searchCategory(categoryCode, categoryGroup string) (bool, string) {
 
 	XMLCategorySearch, xmlmcErr := espXmlmc.Invoke("data", "profileCodeLookup")
 	if xmlmcErr != nil {
-		logger(5, "Unable to Search for "+categoryGroup+" Category: "+fmt.Sprintf("%v", xmlmcErr), false)
+		logger(4, "Unable to Search for "+categoryGroup+" Category: "+fmt.Sprintf("%v", xmlmcErr), false)
 		log.Fatal(xmlmcErr)
 	}
 	var xmlRespon xmlmcCategoryListResponse
 
 	err = xml.Unmarshal([]byte(XMLCategorySearch), &xmlRespon)
 	if err != nil {
-		logger(5, "Unable to Search for "+categoryGroup+" Category: "+fmt.Sprintf("%v", err), false)
+		logger(4, "Unable to Search for "+categoryGroup+" Category: "+fmt.Sprintf("%v", err), false)
 	} else {
 		if xmlRespon.MethodResult != "ok" {
-			logger(5, "Unable to Search for "+categoryGroup+" Category: "+xmlRespon.State.ErrorRet, false)
+			logger(4, "Unable to Search for "+categoryGroup+" Category: "+xmlRespon.State.ErrorRet, false)
 		} else {
 			//-- Check Response
 			if xmlRespon.Params.CategoryName != "" {
@@ -2260,7 +2270,7 @@ func logger(t int, s string, outputtoCLI bool) {
 	if _, err := os.Stat(logPath); os.IsNotExist(err) {
 		err := os.Mkdir(logPath, 0777)
 		if err != nil {
-			fmt.Printf("Error Creating Log Folder %q: %s \r", logPath, err)
+			color.Red("Error Creating Log Folder %q: %s \r", logPath, err)
 			os.Exit(101)
 		}
 	}
@@ -2268,7 +2278,7 @@ func logger(t int, s string, outputtoCLI bool) {
 	//-- Open Log File
 	f, err := os.OpenFile(logFileName, os.O_APPEND|os.O_CREATE|os.O_RDWR, 0777)
 	if err != nil {
-		fmt.Printf("Error Creating Log File %q: %s \n", logFileName, err)
+		color.Red("Error Creating Log File %q: %s \n", logFileName, err)
 		os.Exit(100)
 	}
 	// don't forget to close it
@@ -2280,14 +2290,42 @@ func logger(t int, s string, outputtoCLI bool) {
 	switch t {
 	case 1:
 		errorLogPrefix = "[DEBUG] "
+		if outputtoCLI {
+			color.Set(color.FgGreen)
+			defer color.Unset()
+		}
 	case 2:
 		errorLogPrefix = "[MESSAGE] "
+		if outputtoCLI {
+			color.Set(color.FgGreen)
+			defer color.Unset()
+		}
+	case 3:
+		if outputtoCLI {
+			color.Set(color.FgGreen)
+			defer color.Unset()
+		}
 	case 4:
 		errorLogPrefix = "[ERROR] "
+		if outputtoCLI {
+			color.Set(color.FgRed)
+			defer color.Unset()
+		}
 	case 5:
 		errorLogPrefix = "[WARNING]"
+		if outputtoCLI {
+			color.Set(color.FgYellow)
+			defer color.Unset()
+		}
+	case 6:
+		if outputtoCLI {
+			color.Set(color.FgYellow)
+			defer color.Unset()
+		}
 	}
+
 	if outputtoCLI {
+
 		fmt.Printf("%v \n", errorLogPrefix+s)
 	}
 	log.Println(errorLogPrefix + s)
