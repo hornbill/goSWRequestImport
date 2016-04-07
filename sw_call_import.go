@@ -26,7 +26,7 @@ import (
 )
 
 const (
-	version           = 1.0
+	version           = "1.1.2"
 	appServiceManager = "com.hornbill.servicemanager"
 	//Disk Space Declarations
 	sizeKB        float64 = 1 << (10 * 1)
@@ -34,7 +34,7 @@ const (
 	sizeGB        float64 = 1 << (10 * 3)
 	sizeTB        float64 = 1 << (10 * 4)
 	sizePB        float64 = 1 << (10 * 5)
-	maxGoroutines int     = 3
+	maxGoroutines int     = 6
 )
 
 var (
@@ -53,7 +53,6 @@ var (
 	connStrAppDB        string
 	counters            counterTypeStruct
 	mapGenericConf      swCallConfStruct
-	currentCallRef      string
 	analysts            []analystListStruct
 	categories          []categoryListStruct
 	closeCategories     []categoryListStruct
@@ -906,7 +905,7 @@ func processCallAssociations() {
 		return
 	}
 	logger(3, "[DATABASE] Connection Successful", false)
-	logger(3, "[DATABASE] Running query for Request Associations "+currentCallRef+". Please wait...", false)
+	logger(3, "[DATABASE] Running query for Request Associations. Please wait...", false)
 
 	//build query
 	sqlDiaryQuery := "SELECT fk_callref_m, fk_callref_s from cmn_rel_opencall_oc "
@@ -984,7 +983,7 @@ func processCallData() bool {
 				bar.Increment()
 				mutex.Unlock()
 				callID := fmt.Sprintf("%s", callRecordCallref)
-				currentCallRef = padCallRef(callID, "F", 7)
+				currentCallRef := padCallRef(callID, "F", 7)
 
 				boolCallLogged, hbCallRef := logNewCall(mapGenericConf.CallClass, callRecordArr, callID)
 				if boolCallLogged {
@@ -1330,14 +1329,11 @@ func updateExtraRequestCols(newCallRef string, callMap map[string]interface{}, s
 				espXmlmc.SetParam(strAttribute, strClosureCategoryID)
 			}
 		}
-		if strAttribute == "h_external_ref_number" {
-			PaddedCallref := padCallRef(swCallID, "F", 7)
-			espXmlmc.SetParam(strAttribute, PaddedCallref)
-		} else if strMapping != "" && getFieldValue(strMapping, callMap) != "" {
+
+		if strMapping != "" && getFieldValue(strMapping, callMap) != "" {
 			boolUpdateRequest = true
 			espXmlmc.SetParam(strAttribute, getFieldValue(strMapping, callMap))
 		}
-
 	}
 
 	if boolUpdateRequest == false {
@@ -1386,7 +1382,7 @@ func applyHistoricalUpdates(newCallRef, swCallRef string) bool {
 		return false
 	}
 	logger(3, "[DATABASE] Connection Successful", false)
-	logger(3, "[DATABASE] Running query for Historical Updates of call "+currentCallRef+". Please wait...", false)
+	logger(3, "[DATABASE] Running query for Historical Updates of call "+swCallRef+". Please wait...", false)
 
 	//build query
 	sqlDiaryQuery := "SELECT updatetimex, repid, groupid, udsource, udcode, udtype, updatetxt, udindex, timespent "
@@ -1564,7 +1560,23 @@ func getFieldValue(v string, u map[string]interface{}) string {
 		valFieldMap = strings.Replace(val, "[", "", 1)
 		valFieldMap = strings.Replace(valFieldMap, "]", "", 1)
 		if valFieldMap == "oldCallRef" {
-			fieldMap = strings.Replace(fieldMap, val, currentCallRef, 1)
+			valFieldMap = "h_formattedcallref"
+			if u[valFieldMap] != nil {
+				valFieldMap = fmt.Sprintf("%+s", u[valFieldMap])
+				if valFieldMap != "<nil>" {
+					fieldMap = strings.Replace(fieldMap, val, valFieldMap, 1)
+				}
+			} else {
+				valFieldMap = "callref"
+				if u[valFieldMap] != nil {
+					valFieldMap = fmt.Sprintf("%+s", u[valFieldMap])
+					if valFieldMap != "<nil>" {
+						fieldMap = strings.Replace(fieldMap, val, padCallRef(valFieldMap, "F", 7), 1)
+					}
+				} else {
+					fieldMap = strings.Replace(fieldMap, val, "", 1)
+				}
+			}
 		} else {
 			if u[valFieldMap] != nil {
 				valFieldMap = fmt.Sprintf("%+s", u[valFieldMap])
