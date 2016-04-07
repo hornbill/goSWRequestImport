@@ -13,6 +13,7 @@ import (
 	_ "github.com/hornbill/mysql320" //MySQL v3.2.0 to v5 driver - Provides SWSQL (MySQL 4.0.16) support
 	"github.com/hornbill/pb"
 	"github.com/hornbill/sqlx"
+	"html"
 	"log"
 	"os"
 	"path/filepath"
@@ -24,7 +25,7 @@ import (
 )
 
 const (
-	version           = 1.1
+	version           = 1.0
 	appServiceManager = "com.hornbill.servicemanager"
 	//Disk Space Declarations
 	sizeKB        float64 = 1 << (10 * 1)
@@ -32,7 +33,7 @@ const (
 	sizeGB        float64 = 1 << (10 * 3)
 	sizeTB        float64 = 1 << (10 * 4)
 	sizePB        float64 = 1 << (10 * 5)
-	maxGoroutines int     = 5
+	maxGoroutines int     = 3
 )
 
 var (
@@ -963,8 +964,9 @@ func processCallData() bool {
 		for _, callRecord := range arrCallDetailsMaps {
 			maxGoroutinesGaurd <- struct{}{}
 			wg2.Add(1)
-			arrCallRecord := callRecord
+			callRecordArr := callRecord
 			callRecordCallref := callRecord["callref"]
+
 			go func() {
 				defer wg2.Done()
 				time.Sleep(1 * time.Millisecond)
@@ -973,7 +975,8 @@ func processCallData() bool {
 				mutex.Unlock()
 				callID := fmt.Sprintf("%s", callRecordCallref)
 				currentCallRef = padCallRef(callID, "F", 7)
-				boolCallLogged, hbCallRef := logNewCall(mapGenericConf.CallClass, arrCallRecord, callID)
+
+				boolCallLogged, hbCallRef := logNewCall(mapGenericConf.CallClass, callRecordArr, callID)
 				if boolCallLogged {
 					logger(3, "[REQUEST LOGGED] Request logged successfully: "+hbCallRef+" from Supportworks call "+currentCallRef, false)
 					boolCallDataSuccess = true
@@ -1002,7 +1005,9 @@ func processClosedCalls() {
 	for callref := range arrClosedCalls {
 		maxGoroutinesGaurd <- struct{}{}
 		wg.Add(1)
+		mutex.Lock()
 		callrefLocal := callref
+		mutex.Unlock()
 		go func() {
 			defer wg.Done()
 			currSMFileCallRef, importedCallToClose := arrCallsLogged[callrefLocal]
@@ -1084,12 +1089,13 @@ func queryDBCallDetails(callClass, connString string) bool {
 
 //logNewCall - Function takes Supportworks call data in a map, and logs to Hornbill
 func logNewCall(callClass string, callMap map[string]interface{}, swCallID string) (bool, string) {
+
 	espXmlmc, err := NewEspXmlmcSession()
 	if err != nil {
 		return false, "Unable to create Session"
 	}
 
-	defer EspXmlmcSessionDestroy(espXmlmc)
+	defer EspXmlmcSessiondDestroy(espXmlmc)
 	boolCallLoggedOK := false
 	boolAssignToDefault := false
 	strNewCallRef := ""
@@ -1280,14 +1286,16 @@ func logNewCall(callClass string, callMap map[string]interface{}, swCallID strin
 		if strPriorityID != "" {
 			setPriority(strNewCallRef, strPriorityID, strPriorityName)
 		}
-		updateExtraRequestCols(strNewCallRef, callMap)
+
+		updateExtraRequestCols(strNewCallRef, callMap, swCallID)
 		applyHistoricalUpdates(strNewCallRef, swCallID)
 	}
+
 	return boolCallLoggedOK, strNewCallRef
 }
 
 //updateExtraRequestCols - takes additional mapping from config, updates call record accordingly
-func updateExtraRequestCols(newCallRef string, callMap map[string]interface{}) bool {
+func updateExtraRequestCols(newCallRef string, callMap map[string]interface{}, swCallID string) bool {
 	boolUpdateRequest := false
 	strAttribute := ""
 	strMapping := ""
@@ -1295,7 +1303,7 @@ func updateExtraRequestCols(newCallRef string, callMap map[string]interface{}) b
 	if err != nil {
 		return false
 	}
-	defer EspXmlmcSessionDestroy(espXmlmc)
+	defer EspXmlmcSessiondDestroy(espXmlmc)
 	espXmlmc.SetParam("application", appServiceManager)
 	espXmlmc.SetParam("entity", "Requests")
 	espXmlmc.OpenElement("primaryEntityData")
@@ -1304,6 +1312,7 @@ func updateExtraRequestCols(newCallRef string, callMap map[string]interface{}) b
 	for k, v := range mapGenericConf.AdditionalFieldMapping {
 		strAttribute = fmt.Sprintf("%v", k)
 		strMapping = fmt.Sprintf("%v", v)
+
 		if strAttribute == "h_closure_category_id" && strMapping != "" {
 			strClosureCategoryID := getCallCategoryID(callMap, "Closure")
 			if strClosureCategoryID != "" {
@@ -1311,10 +1320,14 @@ func updateExtraRequestCols(newCallRef string, callMap map[string]interface{}) b
 				espXmlmc.SetParam(strAttribute, strClosureCategoryID)
 			}
 		}
-		if strMapping != "" && getFieldValue(strMapping, callMap) != "" {
+		if strAttribute == "h_external_ref_number" {
+			PaddedCallref := padCallRef(swCallID, "F", 7)
+			espXmlmc.SetParam(strAttribute, PaddedCallref)
+		} else if strMapping != "" && getFieldValue(strMapping, callMap) != "" {
 			boolUpdateRequest = true
 			espXmlmc.SetParam(strAttribute, getFieldValue(strMapping, callMap))
 		}
+
 	}
 
 	if boolUpdateRequest == false {
@@ -1348,7 +1361,7 @@ func applyHistoricalUpdates(newCallRef, swCallRef string) bool {
 	if err != nil {
 		return false
 	}
-	defer EspXmlmcSessionDestroy(espXmlmc)
+	defer EspXmlmcSessiondDestroy(espXmlmc)
 	//Connect to the JSON specified DB
 	db, err := sqlx.Open(appDBDriver, connStrAppDB)
 	defer db.Close()
@@ -1398,6 +1411,7 @@ func applyHistoricalUpdates(newCallRef, swCallRef string) bool {
 			diaryText := ""
 			if diaryEntry["updatetxt"] != nil {
 				diaryText = fmt.Sprintf("%+s", diaryEntry["updatetxt"])
+				diaryText = html.EscapeString(diaryText)
 			}
 
 			espXmlmc.SetParam("application", appServiceManager)
@@ -1464,7 +1478,7 @@ func assignCall(newCallRef, analystID, teamID string, boolDefaultAssign bool) (b
 	if err != nil {
 		return false
 	}
-	defer EspXmlmcSessionDestroy(espXmlmc)
+	defer EspXmlmcSessiondDestroy(espXmlmc)
 	boolDoesOwnerExist := false
 	if analystID != "" && boolDefaultAssign == false {
 		boolDoesOwnerExist = doesOwnerExist(analystID)
@@ -1499,7 +1513,7 @@ func setPriority(newCallRef, priorityID, priorityName string) (boolPrioritised b
 	if err != nil {
 		return false
 	}
-	defer EspXmlmcSessionDestroy(espXmlmc)
+	defer EspXmlmcSessiondDestroy(espXmlmc)
 	espXmlmc.SetParam("requestId", newCallRef)
 	espXmlmc.SetParam("priorityId", priorityID)
 	espXmlmc.SetParam("priorityName", priorityName)
@@ -1728,7 +1742,7 @@ func doesOwnerExist(analystID string) bool {
 	if err != nil {
 		return false
 	}
-	defer EspXmlmcSessionDestroy(espXmlmc)
+	defer EspXmlmcSessiondDestroy(espXmlmc)
 
 	boolOwnerExists := false
 	if analystID != "" {
@@ -1849,7 +1863,7 @@ func searchSite(siteName string) (bool, int) {
 	if err != nil {
 		return false, 0
 	}
-	defer EspXmlmcSessionDestroy(espXmlmc)
+	defer EspXmlmcSessiondDestroy(espXmlmc)
 
 	boolReturn := false
 	intReturn := 0
@@ -1902,7 +1916,7 @@ func searchPriority(priorityName string) (bool, int) {
 	if err != nil {
 		return false, 0
 	}
-	defer EspXmlmcSessionDestroy(espXmlmc)
+	defer EspXmlmcSessiondDestroy(espXmlmc)
 	espXmlmc.SetParam("application", appServiceManager)
 	espXmlmc.SetParam("entity", "Priority")
 	espXmlmc.SetParam("matchScope", "all")
@@ -1951,7 +1965,7 @@ func searchService(serviceName string) (bool, int) {
 	if err != nil {
 		return false, 0
 	}
-	defer EspXmlmcSessionDestroy(espXmlmc)
+	defer EspXmlmcSessiondDestroy(espXmlmc)
 	//-- ESP Query for service
 	espXmlmc.SetParam("application", appServiceManager)
 	espXmlmc.SetParam("entity", "Services")
@@ -2002,7 +2016,7 @@ func searchTeam(teamName string) (bool, string) {
 	if err != nil {
 		return false, "Unable to create connection"
 	}
-	defer EspXmlmcSessionDestroy(espXmlmc)
+	defer EspXmlmcSessiondDestroy(espXmlmc)
 	espXmlmc.SetParam("userId", swImportConf.HBConf.UserName)
 	espXmlmc.SetParam("password", base64.StdEncoding.EncodeToString([]byte(swImportConf.HBConf.Password)))
 	espXmlmc.Invoke("session", "userLogon")
@@ -2051,7 +2065,7 @@ func searchCategory(categoryCode, categoryGroup string) (bool, string) {
 	if err != nil {
 		return false, "Unable to create connection"
 	}
-	defer EspXmlmcSessionDestroy(espXmlmc)
+	defer EspXmlmcSessiondDestroy(espXmlmc)
 	boolReturn := false
 	strReturn := ""
 	//-- ESP Query for category
@@ -2329,7 +2343,7 @@ func epochToDateTime(epochDateString string) string {
 	return dateTime
 }
 
-//NewEspXmlmcSession - Creates new XMLMC Session for seperate instance initialisation
+//NewEspXmlmcSession - starts a new XMLMC session off
 func NewEspXmlmcSession() (*apiLib.XmlmcInstStruct, error) {
 	espXmlmcLocal := apiLib.NewXmlmcInstance(swImportConf.HBConf.URL)
 	espXmlmcLocal.SetParam("userId", swImportConf.HBConf.UserName)
@@ -2339,8 +2353,8 @@ func NewEspXmlmcSession() (*apiLib.XmlmcInstStruct, error) {
 	return espXmlmcLocal, returncode
 }
 
-//EspXmlmcSessionDestroy - ends a given XMLMC session
-func EspXmlmcSessionDestroy(XMLMCSession *apiLib.XmlmcInstStruct) {
+//EspXmlmcSessiondDestroy - Ends a given XMLMC session
+func EspXmlmcSessiondDestroy(XMLMCSession *apiLib.XmlmcInstStruct) {
 
 	XMLMCSession.Invoke("session", "userLogoff")
 
