@@ -73,34 +73,36 @@ Example JSON File:
     "Port": 5002,
     "Encrypt": false
   },
+  "CustomerType": "0",
   "ConfIncident": {
-    "Import":true,
+    "Import":false,
     "CallClass": "Incident",
-    "DefaultTeam":"",
-    "DefaultPriority":"",
-    "DefaultService":"",
-    "SQLStatement":"SELECT opencall.callref, cust_id, itsm_title, owner, suppgroup, status, updatedb.updatetxt, priority, itsm_impact_level, itsm_urgency_level, withinfix, withinresp, bpm_workflow_id, probcode, fixcode, site FROM opencall, updatedb WHERE updatedb.callref = opencall.callref AND updatedb.udindex = 0 AND callclass = 'Incident' AND status != 17 AND appcode = 'ITSM' ",
+    "DefaultTeam":"Service Desk",
+    "DefaultPriority":"Low",
+    "DefaultService":"Desktop Support",
+    "SQLStatement":"SELECT opencall.callref, h_formattedcallref, cust_id, cust_name, itsm_title, owner, suppgroup, status, updatedb.updatetxt, priority, itsm_impact_level, itsm_urgency_level, withinfix, withinresp, bpm_workflow_id, probcode, fixcode, site FROM opencall, updatedb WHERE updatedb.callref = opencall.callref AND updatedb.udindex = 0 AND callclass = 'Incident' AND status != 17 AND appcode = 'ITSM' ",
     "CoreFieldMapping": {
-      "summary":"[itsm_title]",
-      "description":"Supportworks Incident Reference: [oldCallRef]\n\n[updatetxt]",
-      "customerId":"[cust_id]",
-      "customerType":"0",
-      "ownerId":"[owner]",
-      "teamId":"[suppgroup]",
-      "status":"[status]",
-      "priorityId":"[priority]",
-      "categoryId":"[probcode]",
-      "impact":"[itsm_impact_level]",
-      "urgency":"[itsm_urgency_level]",
-      "serviceId":"",
-      "site":"[site]"
-    },
-    "AdditionalFieldMapping":{
+      "h_summary":"[itsm_title]",
+      "h_description":"Supportworks Incident Reference: [oldCallRef]\n\n[updatetxt]",
+      "h_external_ref_number":"[oldCallRef]",
+      "h_fk_user_id":"[cust_id]",
+      "h_status":"[status]",
+      "h_request_language":"en-GB",
+      "h_impact":"[itsm_impact_level]",
+      "h_urgency":"[itsm_urgency_level]",
+      "h_customer_type":"0",
+      "h_fk_serviceid":"",
+      "h_resolution":"",
+      "h_category_id":"[probcode]",
+      "h_closure_category_id":"[fixcode]",
+      "h_ownerid":"[owner]",
+      "h_fk_team_id":"[suppgroup]",
+      "h_fk_priorityid":"",
+      "h_site_id":"[site]",
+      "h_company_id":"",
+      "h_company_name":"",
       "h_withinfix":"[withinfix]",
       "h_withinresponse":"[withinresp]",
-      "h_request_language":"en-GB",
-      "h_external_ref_number":"[oldCallRef]",
-      "h_closure_category_id":"[fixcode]",
       "h_custom_a":"",
       "h_custom_b":"",
       "h_custom_c":"",
@@ -118,36 +120,80 @@ Example JSON File:
       "h_custom_o":"",
       "h_custom_p":"",
       "h_custom_q":""
+    },
+    "AdditionalFieldMapping":{
+      "h_firsttimefix":"",
+      "h_custom_a":"Custom Data",
+      "h_custom_b":"[itsm_title]",
+      "h_custom_c":"",
+      "h_custom_d":"",
+      "h_custom_e":"",
+      "h_custom_f":"",
+      "h_custom_g":"",
+      "h_custom_h":"",
+      "h_custom_i":"",
+      "h_custom_j":"",
+      "h_custom_k":"",
+      "h_custom_l":"",
+      "h_custom_m":"",
+      "h_custom_n":"",
+      "h_custom_o":"",
+      "h_custom_p":"",
+      "h_custom_q":"",
+      "h_flgproblemfix":"",
+      "h_fk_problemfixid":"",
+      "h_flgfixisworkaround":"",
+      "h_flg_fixisresolution":""
     }
   },
   "ConfServiceRequest": {
-    "Import":true,
+    "Import":false,
     "CallClass": "Service Request",
-    "DefaultTeam":"",
-    "DefaultPriority":"",
-    "DefaultService":"",
-    "SQLStatement":"SELECT opencall.callref, cust_id, itsm_title, owner, suppgroup, status, updatedb.updatetxt, priority, itsm_impact_level, itsm_urgency_level, withinfix, withinresp, bpm_workflow_id, probcode, fixcode, site, service_name FROM opencall, updatedb LEFT JOIN sc_folio ON sc_folio.fk_cmdb_id = opencall.itsm_fk_service WHERE updatedb.callref = opencall.callref AND updatedb.udindex = 0 AND callclass = 'Service Request' AND status != 17 AND appcode = 'ITSM' ",
+    "DefaultTeam":"Service Desk",
+    "DefaultPriority":"Low",
+    "DefaultService":"Desktop Support",
+    "SQLStatement":"SELECT opencall.callref, h_formattedcallref, cust_id, itsm_title, owner, suppgroup, status, updatedb.updatetxt, priority, itsm_impact_level, itsm_urgency_level, withinfix, withinresp, bpm_workflow_id, probcode, fixcode, site, service_name FROM opencall, updatedb LEFT JOIN sc_folio ON sc_folio.fk_cmdb_id = opencall.itsm_fk_service WHERE updatedb.callref = opencall.callref AND updatedb.udindex = 0 AND callclass = 'Service Request' AND status != 17 AND appcode = 'ITSM'",
     "CoreFieldMapping": {
-      "summary":"[itsm_title]",
-      "description":"Supportworks Service Request Reference: [oldCallRef]\n\n[updatetxt]",
-      "customerId":"[cust_id]",
-      "customerType":"0",
-      "ownerId":"[owner]",
-      "teamId":"[suppgroup]",
-      "status":"[status]",
-      "priorityId":"[priority]",
-      "categoryId":"[probcode]",
-      "impact":"[itsm_impact_level]",
-      "urgency":"[itsm_urgency_level]",
-      "serviceId":"[service_name]",
-      "site":"[site]"
-    },
-    "AdditionalFieldMapping":{
+      "h_summary":"[itsm_title]",
+      "h_description":"Supportworks Service Request Reference: [oldCallRef]\n\n[updatetxt]",
+      "h_external_ref_number":"[oldCallRef]",
+      "h_fk_user_id":"[cust_id]",
+      "h_status":"[status]",
+      "h_request_language":"en-GB",
+      "h_impact":"[itsm_impact_level]",
+      "h_urgency":"[itsm_urgency_level]",
+      "h_customer_type":"0",
+      "h_fk_serviceid":"[service_name]",
+      "h_resolution":"",
+      "h_category_id":"[probcode]",
+      "h_closure_category_id":"[fixcode]",
+      "h_ownerid":"[owner]",
+      "h_fk_team_id":"[suppgroup]",
+      "h_fk_priorityid":"",
+      "h_site_id":"[site]",
+      "h_company_id":"",
+      "h_company_name":"",
       "h_withinfix":"[withinfix]",
       "h_withinresponse":"[withinresp]",
-      "h_request_language":"en-GB",
-      "h_external_ref_number":"[oldCallRef]",
-      "h_closure_category_id":"[fixcode]",
+      "h_custom_a":"",
+      "h_custom_b":"",
+      "h_custom_c":"",
+      "h_custom_d":"",
+      "h_custom_e":"",
+      "h_custom_f":"",
+      "h_custom_g":"",
+      "h_custom_h":"",
+      "h_custom_i":"",
+      "h_custom_j":"",
+      "h_custom_k":"",
+      "h_custom_l":"",
+      "h_custom_m":"",
+      "h_custom_n":"",
+      "h_custom_o":"",
+      "h_custom_p":"",
+      "h_custom_q":""
+    },
+    "AdditionalFieldMapping":{
       "h_custom_a":"",
       "h_custom_b":"",
       "h_custom_c":"",
@@ -168,34 +214,34 @@ Example JSON File:
     }
   },
   "ConfChangeRequest": {
-    "Import":true,
+    "Import":false,
     "CallClass": "Change Request",
-    "DefaultTeam":"",
-    "DefaultPriority":"",
-    "DefaultService":"",
-    "SQLStatement":"SELECT opencall.callref, cust_id, itsm_title, owner, suppgroup, status, updatedb.updatetxt, priority, itsm_impact_level, itsm_urgency_level, withinfix, withinresp, bpm_workflow_id, probcode, fixcode, site FROM opencall, updatedb WHERE updatedb.callref = opencall.callref AND updatedb.udindex = 0 AND callclass = 'Change Request' AND status != 17 AND appcode = 'ITSM' ",
+    "DefaultTeam":"Service Desk",
+    "DefaultPriority":"Low",
+    "DefaultService":"Desktop Support",
+    "SQLStatement":"SELECT opencall.callref, h_formattedcallref, cust_id, itsm_title, owner, suppgroup, status, updatedb.updatetxt, priority, itsm_impact_level, itsm_urgency_level, withinfix, withinresp, bpm_workflow_id, probcode, fixcode, site FROM opencall, updatedb WHERE updatedb.callref = opencall.callref AND updatedb.udindex = 0 AND callclass = 'Change Request' AND status != 17 AND appcode = 'ITSM' ",
     "CoreFieldMapping": {
-      "summary":"[itsm_title]",
-      "description":"Supportworks Change Request Reference: [oldCallRef]\n\n[updatetxt]",
-      "customerId":"[cust_id]",
-      "customerType":"0",
-      "ownerId":"[owner]",
-      "teamId":"[suppgroup]",
-      "status":"[status]",
-      "priorityId":"[priority]",
-      "categoryId":"[probcode]",
-      "impact":"[itsm_impact_level]",
-      "urgency":"[itsm_urgency_level]",
-      "serviceId":"[service_name]",
-      "site":"[site]",
-      "changeType":""
-    },
-    "AdditionalFieldMapping":{
+      "h_summary":"[itsm_title]",
+      "h_description":"Supportworks Change Request Reference: [oldCallRef]\n\n[updatetxt]",
+      "h_external_ref_number":"[oldCallRef]",
+      "h_fk_user_id":"[cust_id]",
+      "h_status":"[status]",
+      "h_request_language":"en-GB",
+      "h_impact":"[itsm_impact_level]",
+      "h_urgency":"[itsm_urgency_level]",
+      "h_customer_type":"0",
+      "h_fk_serviceid":"",
+      "h_resolution":"",
+      "h_category_id":"[probcode]",
+      "h_closure_category_id":"[fixcode]",
+      "h_ownerid":"[owner]",
+      "h_fk_team_id":"[suppgroup]",
+      "h_fk_priorityid":"",
+      "h_site_id":"[site]",
+      "h_company_id":"",
+      "h_company_name":"",
       "h_withinfix":"[withinfix]",
       "h_withinresponse":"[withinresp]",
-      "h_request_language":"en-GB",
-      "h_external_ref_number":"[oldCallRef]",
-      "h_closure_category_id":"[fixcode]",
       "h_custom_a":"",
       "h_custom_b":"",
       "h_custom_c":"",
@@ -213,36 +259,80 @@ Example JSON File:
       "h_custom_o":"",
       "h_custom_p":"",
       "h_custom_q":""
+    },
+    "AdditionalFieldMapping":{
+      "h_start_time":"",
+      "h_end_time":"",
+      "h_change_type":"",
+      "h_custom_a":"",
+      "h_custom_b":"",
+      "h_custom_c":"",
+      "h_custom_d":"",
+      "h_custom_e":"",
+      "h_custom_f":"",
+      "h_custom_g":"",
+      "h_custom_h":"",
+      "h_custom_i":"",
+      "h_custom_j":"",
+      "h_custom_k":"",
+      "h_custom_l":"",
+      "h_custom_m":"",
+      "h_custom_n":"",
+      "h_custom_o":"",
+      "h_custom_p":"",
+      "h_custom_q":"",
+      "h_scheduled":""
     }
   },
   "ConfProblem": {
-    "Import":true,
+    "Import":false,
     "CallClass": "Problem",
-    "DefaultTeam":"",
-    "DefaultPriority":"",
-    "DefaultService":"",
-    "SQLStatement":"SELECT opencall.callref, cust_id, itsm_title, owner, suppgroup, status, updatedb.updatetxt, priority, itsm_impact_level, itsm_urgency_level, withinfix, withinresp, bpm_workflow_id, probcode, fixcode, site FROM opencall, updatedb WHERE updatedb.callref = opencall.callref AND updatedb.udindex = 0 AND callclass = 'Problem' AND status != 17 AND appcode = 'ITSM' ",
+    "DefaultTeam":"Service Desk",
+    "DefaultPriority":"Low",
+    "DefaultService":"Desktop Support",
+    "SQLStatement":"SELECT opencall.callref, h_formattedcallref, cust_id, itsm_title, owner, suppgroup, status, updatedb.updatetxt, priority, itsm_impact_level, itsm_urgency_level, withinfix, withinresp, bpm_workflow_id, probcode, fixcode, site FROM opencall, updatedb WHERE updatedb.callref = opencall.callref AND updatedb.udindex = 0 AND callclass = 'Problem' AND status != 17 AND appcode = 'ITSM' ",
     "CoreFieldMapping": {
-      "summary":"[itsm_title]",
-      "description":"Supportworks Problem Reference: [oldCallRef]\n\n[updatetxt]",
-      "customerId":"[cust_id]",
-      "customerType":"0",
-      "ownerId":"[owner]",
-      "teamId":"[suppgroup]",
-      "status":"[status]",
-      "priorityId":"[priority]",
-      "categoryId":"[probcode]",
-      "impact":"[itsm_impact_level]",
-      "urgency":"[itsm_urgency_level]",
-      "serviceId":"[service_name]",
-      "site":"[site]"
-    },
-    "AdditionalFieldMapping":{
+      "h_summary":"[itsm_title]",
+      "h_description":"Supportworks Problem Reference: [oldCallRef]\n\n[updatetxt]",
+      "h_external_ref_number":"[oldCallRef]",
+      "h_fk_user_id":"[cust_id]",
+      "h_status":"[status]",
+      "h_request_language":"en-GB",
+      "h_impact":"[itsm_impact_level]",
+      "h_urgency":"[itsm_urgency_level]",
+      "h_customer_type":"0",
+      "h_fk_serviceid":"",
+      "h_resolution":"",
+      "h_category_id":"[probcode]",
+      "h_closure_category_id":"[fixcode]",
+      "h_ownerid":"[owner]",
+      "h_fk_team_id":"[suppgroup]",
+      "h_fk_priorityid":"",
+      "h_site_id":"[site]",
+      "h_company_id":"",
+      "h_company_name":"",
       "h_withinfix":"[withinfix]",
       "h_withinresponse":"[withinresp]",
-      "h_request_language":"en-GB",
-      "h_external_ref_number":"[oldCallRef]",
-      "h_closure_category_id":"[fixcode]",
+      "h_custom_a":"",
+      "h_custom_b":"",
+      "h_custom_c":"",
+      "h_custom_d":"",
+      "h_custom_e":"",
+      "h_custom_f":"",
+      "h_custom_g":"",
+      "h_custom_h":"",
+      "h_custom_i":"",
+      "h_custom_j":"",
+      "h_custom_k":"",
+      "h_custom_l":"",
+      "h_custom_m":"",
+      "h_custom_n":"",
+      "h_custom_o":"",
+      "h_custom_p":"",
+      "h_custom_q":""
+    },
+    "AdditionalFieldMapping":{
+      "h_workaround":"",
       "h_custom_a":"",
       "h_custom_b":"",
       "h_custom_c":"",
@@ -263,33 +353,34 @@ Example JSON File:
     }
   },
   "ConfKnownError": {
-    "Import":true,
+    "Import":false,
     "CallClass": "Known Error",
-    "DefaultTeam":"",
-    "DefaultPriority":"",
-    "DefaultService":"",
-    "SQLStatement":"SELECT opencall.callref, cust_id, itsm_title, owner, suppgroup, status, updatedb.updatetxt, priority, itsm_impact_level, itsm_urgency_level, withinfix, withinresp, bpm_workflow_id, probcode, fixcode, site FROM opencall, updatedb WHERE updatedb.callref = opencall.callref AND updatedb.udindex = 0 AND callclass = 'Known Error' AND status != 17 AND appcode = 'ITSM' ",
+    "DefaultTeam":"Service Desk",
+    "DefaultPriority":"Low",
+    "DefaultService":"Desktop Support",
+    "SQLStatement":"SELECT opencall.callref, h_formattedcallref, cust_id, itsm_title, owner, suppgroup, status, updatedb.updatetxt, priority, itsm_impact_level, itsm_urgency_level, withinfix, withinresp, bpm_workflow_id, probcode, fixcode, site FROM opencall, updatedb WHERE updatedb.callref = opencall.callref AND updatedb.udindex = 0 AND callclass = 'Known Error' AND status != 17 AND appcode = 'ITSM' ",
     "CoreFieldMapping": {
-      "summary":"[itsm_title]",
-      "description":"Supportworks Known Error Reference: [oldCallRef]\n\n[updatetxt]",
-      "customerId":"[cust_id]",
-      "customerType":"0",
-      "ownerId":"[owner]",
-      "teamId":"[suppgroup]",
-      "status":"[status]",
-      "priorityId":"[priority]",
-      "categoryId":"[probcode]",
-      "impact":"[itsm_impact_level]",
-      "urgency":"[itsm_urgency_level]",
-      "serviceId":"",
-      "site":"[site]"
-    },
-    "AdditionalFieldMapping":{
+      "h_summary":"[itsm_title]",
+      "h_description":"Supportworks Known Error Reference: [oldCallRef]\n\n[updatetxt]",
+      "h_external_ref_number":"[oldCallRef]",
+      "h_fk_user_id":"[cust_id]",
+      "h_status":"[status]",
+      "h_request_language":"en-GB",
+      "h_impact":"[itsm_impact_level]",
+      "h_urgency":"[itsm_urgency_level]",
+      "h_customer_type":"0",
+      "h_fk_serviceid":"",
+      "h_resolution":"",
+      "h_category_id":"[probcode]",
+      "h_closure_category_id":"[fixcode]",
+      "h_ownerid":"[owner]",
+      "h_fk_team_id":"[suppgroup]",
+      "h_fk_priorityid":"",
+      "h_site_id":"[site]",
+      "h_company_id":"",
+      "h_company_name":"",
       "h_withinfix":"[withinfix]",
       "h_withinresponse":"[withinresp]",
-      "h_request_language":"en-GB",
-      "h_external_ref_number":"[oldCallRef]",
-      "h_closure_category_id":"[fixcode]",
       "h_custom_a":"",
       "h_custom_b":"",
       "h_custom_c":"",
@@ -308,21 +399,44 @@ Example JSON File:
       "h_custom_p":"",
       "h_custom_q":""
     },
-    "PriorityMapping": {
-      "Supportworks Priority":"Service Manager Priority"
-    },
-    "TeamMapping": {
-      "Supportworks Group ID":"Service Manager Team Name"
-    },
-    "CategoryMapping": {
-      "Supportworks Profile Code":"Service Manager Profile Code"
-    },
-    "ResolutionCategoryMapping": {
-      "Supportworks Resolution Profile Code":"Service Manager Resolution Profile Code"
-    },
-    "ServiceMapping": {
-      "Supportworks Service Name":"Service Manager Service Name"
+    "AdditionalFieldMapping":{
+      "h_solution":"",
+      "h_root_cause":"",
+      "h_steps_to_resolve":"",
+      "h_custom_a":"",
+      "h_custom_b":"",
+      "h_custom_c":"",
+      "h_custom_d":"",
+      "h_custom_e":"",
+      "h_custom_f":"",
+      "h_custom_g":"",
+      "h_custom_h":"",
+      "h_custom_i":"",
+      "h_custom_j":"",
+      "h_custom_k":"",
+      "h_custom_l":"",
+      "h_custom_m":"",
+      "h_custom_n":"",
+      "h_custom_o":"",
+      "h_custom_p":"",
+      "h_custom_q":""
     }
+  },
+  "PriorityMapping": {
+    "Supportworks Priority":"Service Manager Priority"
+  },
+  "TeamMapping": {
+    "Supportworks Group ID":"Service Manager Team Name"
+  },
+  "CategoryMapping": {
+    "Supportworks Profile Code":"Service Manager Profile Code"
+  },
+  "ResolutionCategoryMapping": {
+    "Supportworks Resolution Profile Code":"Service Manager Resolution Profile Code"
+  },
+  "ServiceMapping": {
+    "Supportworks Service Name":"Service Manager Service Name"
+  }
 }
 ```
 
@@ -358,6 +472,11 @@ Contains the connection information for the Supportworks application database (s
 * "Port" SQL port (5002 if the data is hosted on the Supportworks server)
 * "Encrypt" Boolean value to specify whether the connection between the script and the database should be encrypted. ''NOTE'': There is a bug in SQL Server 2008 and below that causes the connection to fail if the connection is encrypted. Only set this to true if your SQL Server has been patched accordingly.
 
+#### CustomerType
+Integer value 0 or 1, to determine the customer type for the records being imported:
+* 0 - Hornbill Users
+* 1 - Hornbill Contacts
+
 #### ConfCallClass
 Contains request-class specific configuration. This section should be repeated for all Service Manager Call Classes.
 * Import - boolean true/false. Specifies whether the current class section should be included in the import.
@@ -369,10 +488,17 @@ Contains request-class specific configuration. This section should be repeated f
 * CoreFieldMapping - The core fields used by the API calls to raise requests within Service Manager, and how the Supportworks data should be mapped in to these fields.
 * - Any value wrapped with [] will be populated with the corresponding response from the SQL Query
 * - Any Other Value is treated literally as written example:
-* -- "summary":"[itsm_title]", - the value of itsm_title is taken from the SQL output and populated within this field
-* -- "description":"Supportworks Incident Reference: [oldCallRef]\n\n[updatetxt]", - the request description would be populated with "Supportworks Incident Reference: ", followed by the Supportworks call reference, 2 new lines then the call description text from the Supportworks call.
-* -- "site":"[site]", - When a string is passed to the site field, the script attempts to resolve the given site name against the Site entity, and populates the request with the correct site information. If the site cannot be resolved, the site details are not populated for the request being imported.
-* -- NOTE - Change Requests can have a core variable named changeType. Again, this can be populated either by using the SQL output, or a hard-coded value in the JSON config.
+* -- "h_summary":"[itsm_title]", - the value of itsm_title is taken from the SQL output and populated within this field
+* -- "h_description":"Supportworks Incident Reference: [oldCallRef]\n\n[updatetxt]", - the request description would be populated with "Supportworks Incident Reference: ", followed by the Supportworks call reference, 2 new lines then the call description text from the Supportworks call.
+* Core Fields that can resolve associated record from passed-through value:   
+* -- "h_site_id":"[site]", - When a string is passed to the site field, the script attempts to resolve the given site name against the Site entity, and populates the request with the correct site information. If the site cannot be resolved, the site details are not populated for the request being imported.
+* -- "h_fk_user_id":"[cust_id]", - As site, above, but resolves the original request customer against the users or contacts within Hornbill.
+* -- "h_ownerid":"[owner]", - As site, above, but resolves the original request owner against the analysts within Hornbill.
+* -- "h_category_id":"[probcode]", - As site, above, but uses additional CategoryMapping from the configuration, as detailed below.
+* -- "h_closure_category_id":"[fixcode]", - As site, above, but uses additional ResolutionCategoryMapping from the configuration, as detailed below.
+* -- "h_ownerid":"[owner]", - As site, above, but resolves the original request owner against the analysts within Hornbill.
+* -- "h_fk_team_id":"[suppgroup]", - As site, above,  but uses additional TeamMapping from the configuration, as detailed below.
+* -- "h_fk_priorityid":"[priority]", - As site, above, but uses additional PriorityMapping from the configuration, as detailed below.
 * AdditionalFieldMapping - Contains additional columns that can be stored against the new request record. Mapping rules are as above.
 
 #### PriorityMapping

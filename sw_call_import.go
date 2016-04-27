@@ -9,7 +9,7 @@ import (
 	"fmt"
 	"github.com/hornbill/color"
 	_ "github.com/hornbill/go-mssqldb" //Microsoft SQL Server driver - v2005+
-	"github.com/hornbill/goApiLib"
+	"github.com/hornbill/goapiLib"
 	_ "github.com/hornbill/mysql"    //MySQL v4.1 to v5.x and MariaDB driver
 	_ "github.com/hornbill/mysql320" //MySQL v3.2.0 to v5 driver - Provides SWSQL (MySQL 4.0.16) support
 	"github.com/hornbill/pb"
@@ -26,55 +26,68 @@ import (
 )
 
 const (
-	version           = "1.1.2"
+	version           = "1.2.0"
 	appServiceManager = "com.hornbill.servicemanager"
 	//Disk Space Declarations
-	sizeKB        float64 = 1 << (10 * 1)
-	sizeMB        float64 = 1 << (10 * 2)
-	sizeGB        float64 = 1 << (10 * 3)
-	sizeTB        float64 = 1 << (10 * 4)
-	sizePB        float64 = 1 << (10 * 5)
-	maxGoroutines int     = 6
+	sizeKB            float64 = 1 << (10 * 1)
+	sizeMB            float64 = 1 << (10 * 2)
+	sizeGB            float64 = 1 << (10 * 3)
+	sizeTB            float64 = 1 << (10 * 4)
+	sizePB            float64 = 1 << (10 * 5)
+	maxGoroutines     int     = 15
+	maxFileGoroutines int     = 10
 )
 
 var (
-	appDBDriver         string
-	cacheDBDriver       string
-	arrCallsLogged      = make(map[string]string)
-	arrClosedCalls      = make(map[string]string)
-	arrCallDetailsMaps  = make([]map[string]interface{}, 0)
-	arrSWStatus         = make(map[string]string)
-	boolConfLoaded      bool
-	boolProcessClass    bool
-	configFileName      string
-	configZone          string
-	configDryRun        bool
-	connStrSysDB        string
-	connStrAppDB        string
-	counters            counterTypeStruct
-	mapGenericConf      swCallConfStruct
-	analysts            []analystListStruct
-	categories          []categoryListStruct
-	closeCategories     []categoryListStruct
-	priorities          []priorityListStruct
-	services            []serviceListStruct
-	sites               []siteListStruct
-	teams               []teamListStruct
-	strNewCallRef       string
-	sqlCallQuery        string
-	swImportConf        swImportConfStruct
-	timeNow             string
-	startTime           time.Time
-	endTime             time.Duration
-	espXmlmc            *apiLib.XmlmcInstStruct
-	xmlmcInstanceConfig xmlmcConfigStruct
-	mutex               = &sync.Mutex{}
-	wg                  sync.WaitGroup
-	wg2                 sync.WaitGroup
+	appDBDriver          string
+	cacheDBDriver        string
+	arrCallsLogged       = make(map[string]string)
+	arrCallDetailsMaps   = make([]map[string]interface{}, 0)
+	arrSWStatus          = make(map[string]string)
+	boolConfLoaded       bool
+	boolProcessClass     bool
+	configFileName       string
+	configZone           string
+	configDryRun         bool
+	connStrSysDB         string
+	connStrAppDB         string
+	counters             counterTypeStruct
+	mapGenericConf       swCallConfStruct
+	analysts             []analystListStruct
+	categories           []categoryListStruct
+	closeCategories      []categoryListStruct
+	customers            []customerListStruct
+	priorities           []priorityListStruct
+	services             []serviceListStruct
+	sites                []siteListStruct
+	teams                []teamListStruct
+	importFiles          []fileAssocStruct
+	sqlCallQuery         string
+	swImportConf         swImportConfStruct
+	timeNow              string
+	startTime            time.Time
+	endTime              time.Duration
+	espXmlmc             *apiLib.XmlmcInstStruct
+	xmlmcInstanceConfig  xmlmcConfigStruct
+	mutex                = &sync.Mutex{}
+	mutexAnalysts        = &sync.Mutex{}
+	mutexArrCallsLogged  = &sync.Mutex{}
+	mutexBar             = &sync.Mutex{}
+	mutexCategories      = &sync.Mutex{}
+	mutexCloseCategories = &sync.Mutex{}
+	mutexCustomers       = &sync.Mutex{}
+	mutexPriorities      = &sync.Mutex{}
+	mutexServices        = &sync.Mutex{}
+	mutexSites           = &sync.Mutex{}
+	mutexTeams           = &sync.Mutex{}
+	wgRequest            sync.WaitGroup
+	wgAssoc              sync.WaitGroup
+	wgFile               sync.WaitGroup
 )
 
 // ----- Structures -----
 type counterTypeStruct struct {
+	sync.Mutex
 	created        int
 	createdSkipped int
 }
@@ -84,6 +97,7 @@ type swImportConfStruct struct {
 	HBConf                    hbConfStruct //Hornbill Instance connection details
 	SWServerAddress           string
 	AttachmentRoot            string
+	CustomerType              string
 	SWSystemDBConf            sysDBConfStruct //Cache Data (sw_systemdb) connection details
 	SWAppDBConf               appDBConfStruct //App Data (swdata) connection details
 	ConfIncident              swCallConfStruct
@@ -135,32 +149,41 @@ type xmlmcConfigStruct struct {
 	zone     string
 }
 type xmlmcResponse struct {
-	MethodResult string       `xml:"status,attr"`
-	Params       paramsStruct `xml:"params"`
-	State        stateStruct  `xml:"state"`
+	MethodResult string      `xml:"status,attr"`
+	State        stateStruct `xml:"state"`
+}
+
+//----- Shared Structs -----
+type stateStruct struct {
+	Code     string `xml:"code"`
+	ErrorRet string `xml:"error"`
 }
 
 //----- Data Structs -----
+//----- Request Logged Structs
+type xmlmcRequestResponseStruct struct {
+	MethodResult string      `xml:"status,attr"`
+	RequestID    string      `xml:"params>primaryEntityData>record>h_pk_reference"`
+	SiteCountry  string      `xml:"params>rowData>row>h_country"`
+	State        stateStruct `xml:"state"`
+}
+type xmlmcBPMSpawnedStruct struct {
+	MethodResult string      `xml:"status,attr"`
+	Identifier   string      `xml:"params>identifier"`
+	State        stateStruct `xml:"state"`
+}
+
 //----- Site Structs
 type siteListStruct struct {
 	SiteName string
 	SiteID   int
 }
 type xmlmcSiteListResponse struct {
-	MethodResult string               `xml:"status,attr"`
-	Params       paramsSiteListStruct `xml:"params"`
-	State        stateStruct          `xml:"state"`
-}
-type paramsSiteListStruct struct {
-	RowData paramsSiteRowDataListStruct `xml:"rowData"`
-}
-type paramsSiteRowDataListStruct struct {
-	Row siteObjectStruct `xml:"row"`
-}
-type siteObjectStruct struct {
-	SiteID      int    `xml:"h_id"`
-	SiteName    string `xml:"h_site_name"`
-	SiteCountry string `xml:"h_country"`
+	MethodResult string      `xml:"status,attr"`
+	SiteID       int         `xml:"params>rowData>row>h_id"`
+	SiteName     string      `xml:"params>rowData>row>h_site_name"`
+	SiteCountry  string      `xml:"params>rowData>row>h_country"`
+	State        stateStruct `xml:"state"`
 }
 
 //----- Priority Structs
@@ -169,40 +192,32 @@ type priorityListStruct struct {
 	PriorityID   int
 }
 type xmlmcPriorityListResponse struct {
-	MethodResult string                   `xml:"status,attr"`
-	Params       paramsPriorityListStruct `xml:"params"`
-	State        stateStruct              `xml:"state"`
-}
-type paramsPriorityListStruct struct {
-	RowData paramsPriorityRowDataListStruct `xml:"rowData"`
-}
-type paramsPriorityRowDataListStruct struct {
-	Row priorityObjectStruct `xml:"row"`
-}
-type priorityObjectStruct struct {
-	PriorityID   int    `xml:"h_pk_priorityid"`
-	PriorityName string `xml:"h_priorityname"`
+	MethodResult string      `xml:"status,attr"`
+	PriorityID   int         `xml:"params>rowData>row>h_pk_priorityid"`
+	PriorityName string      `xml:"params>rowData>row>h_priorityname"`
+	State        stateStruct `xml:"state"`
 }
 
 //----- Service Structs
 type serviceListStruct struct {
-	ServiceName string
-	ServiceID   int
+	ServiceName          string
+	ServiceID            int
+	ServiceBPMIncident   string
+	ServiceBPMService    string
+	ServiceBPMChange     string
+	ServiceBPMProblem    string
+	ServiceBPMKnownError string
 }
 type xmlmcServiceListResponse struct {
-	MethodResult string                  `xml:"status,attr"`
-	Params       paramsServiceListStruct `xml:"params"`
-	State        stateStruct             `xml:"state"`
-}
-type paramsServiceListStruct struct {
-	RowData paramsServiceRowDataListStruct `xml:"rowData"`
-}
-type paramsServiceRowDataListStruct struct {
-	Row serviceObjectStruct `xml:"row"`
-}
-type serviceObjectStruct struct {
-	ServiceID   int    `xml:"h_pk_serviceid"`
-	ServiceName string `xml:"h_servicename"`
+	MethodResult  string      `xml:"status,attr"`
+	ServiceID     int         `xml:"params>rowData>row>h_pk_serviceid"`
+	ServiceName   string      `xml:"params>rowData>row>h_servicename"`
+	BPMIncident   string      `xml:"params>rowData>row>h_incident_bpm_name"`
+	BPMService    string      `xml:"params>rowData>row>h_service_bpm_name"`
+	BPMChange     string      `xml:"params>rowData>row>h_change_bpm_name"`
+	BPMProblem    string      `xml:"params>rowData>row>h_problem_bpm_name"`
+	BPMKnownError string      `xml:"params>rowData>row>h_knownerror_bpm_name"`
+	State         stateStruct `xml:"state"`
 }
 
 //----- Team Structs
@@ -211,45 +226,31 @@ type teamListStruct struct {
 	TeamID   string
 }
 type xmlmcTeamListResponse struct {
-	MethodResult string               `xml:"status,attr"`
-	Params       paramsTeamListStruct `xml:"params"`
-	State        stateStruct          `xml:"state"`
-}
-type paramsTeamListStruct struct {
-	RowData paramsTeamRowDataListStruct `xml:"rowData"`
-}
-type paramsTeamRowDataListStruct struct {
-	Row teamObjectStruct `xml:"row"`
-}
-type teamObjectStruct struct {
-	TeamID   string `xml:"h_id"`
-	TeamName string `xml:"h_name"`
+	MethodResult string      `xml:"status,attr"`
+	TeamID       string      `xml:"params>rowData>row>h_id"`
+	TeamName     string      `xml:"params>rowData>row>h_name"`
+	State        stateStruct `xml:"state"`
 }
 
 //----- Category Structs
 type categoryListStruct struct {
 	CategoryCode string
 	CategoryID   string
+	CategoryName string
 }
 type xmlmcCategoryListResponse struct {
-	MethodResult string               `xml:"status,attr"`
-	Params       categoryObjectStruct `xml:"params"`
-	State        stateStruct          `xml:"state"`
-}
-type categoryObjectStruct struct {
-	CategoryID   string `xml:"id"`
-	CategoryName string `xml:"fullname"`
+	MethodResult string      `xml:"status,attr"`
+	CategoryID   string      `xml:"params>id"`
+	CategoryName string      `xml:"params>fullname"`
+	State        stateStruct `xml:"state"`
 }
 
 //----- Audit Structs
 type xmlmcAuditListResponse struct {
-	MethodResult string            `xml:"status,attr"`
-	Params       auditObjectStruct `xml:"params"`
-	State        stateStruct       `xml:"state"`
-}
-type auditObjectStruct struct {
-	TotalStorage     float64 `xml:"maxStorageAvailble"`
-	TotalStorageUsed float64 `xml:"totalStorageUsed"`
+	MethodResult     string      `xml:"status,attr"`
+	TotalStorage     float64     `xml:"params>maxStorageAvailble"`
+	TotalStorageUsed float64     `xml:"params>totalStorageUsed"`
+	State            stateStruct `xml:"state"`
 }
 
 //----- Analyst Structs
@@ -258,19 +259,23 @@ type analystListStruct struct {
 	AnalystName string
 }
 type xmlmcAnalystListResponse struct {
-	MethodResult string                  `xml:"status,attr"`
-	Params       paramsAnalystListStruct `xml:"params"`
-	State        stateStruct             `xml:"state"`
+	MethodResult     string      `xml:"status,attr"`
+	AnalystFullName  string      `xml:"params>name"`
+	AnalystFirstName string      `xml:"params>firstName"`
+	AnalystLastName  string      `xml:"params>lastName"`
+	State            stateStruct `xml:"state"`
 }
-type paramsAnalystListStruct struct {
-	RowData paramsAnalystRowDataListStruct `xml:"rowData"`
+
+//----- Customer Structs
+type customerListStruct struct {
+	CustomerID   string
+	CustomerName string
 }
-type paramsAnalystRowDataListStruct struct {
-	Row analystObjectStruct `xml:"row"`
-}
-type analystObjectStruct struct {
-	AnalystID   string `xml:"h_user_id"`
-	AnalystName string `xml:"h_name"`
+type xmlmcCustomerListResponse struct {
+	MethodResult      string      `xml:"status,attr"`
+	CustomerFirstName string      `xml:"params>firstName"`
+	CustomerLastName  string      `xml:"params>lastName"`
+	State             stateStruct `xml:"state"`
 }
 
 //----- Associated Record Struct
@@ -281,40 +286,20 @@ type reqRelStruct struct {
 
 //----- File Attachment Structs
 type xmlmcAttachmentResponse struct {
-	MethodResult string                 `xml:"status,attr"`
-	Params       paramsAttachmentStruct `xml:"params"`
-	State        stateStruct            `xml:"state"`
-}
-type paramsAttachmentStruct struct {
-	ContentLocation string `xml:"contentLocation"`
-}
-type xmlmcNewAttachmentResponse struct {
-	MethodResult string                    `xml:"status,attr"`
-	Params       paramsNewAttachmentStruct `xml:"params"`
-	State        stateStruct               `xml:"state"`
-}
-type paramsNewAttachmentStruct struct {
-	EntityData entityDataStruct `xml:"primaryEntityData"`
-}
-type entityDataStruct struct {
-	Record recordDataStruct `xml:"record"`
-}
-type recordDataStruct struct {
-	PriKey string `xml:"h_pk_id"`
+	MethodResult    string      `xml:"status,attr"`
+	ContentLocation string      `xml:"params>contentLocation"`
+	State           stateStruct `xml:"state"`
 }
 
 //----- Email Attachment Structs
 type xmlmcEmailAttachmentResponse struct {
-	MethodResult string                      `xml:"status,attr"`
-	Params       paramsEmailAttachmentStruct `xml:"params"`
-	State        stateStruct                 `xml:"state"`
-}
-type paramsEmailAttachmentStruct struct {
-	Recipients []recipientStruct `xml:"recipient"`
-	Subject    string            `xml:"subject"`
-	Body       string            `xml:"body"`
-	HTMLBody   string            `xml:"htmlBody"`
-	TimeSent   string            `xml:"timeSent"`
+	MethodResult string            `xml:"status,attr"`
+	Recipients   []recipientStruct `xml:"params>recipient"`
+	Subject      string            `xml:"params>subject"`
+	Body         string            `xml:"params>body"`
+	HTMLBody     string            `xml:"params>htmlBody"`
+	TimeSent     string            `xml:"params>timeSent"`
+	State        stateStruct       `xml:"state"`
 }
 type recipientStruct struct {
 	Class   string `xml:"class"`
@@ -322,18 +307,10 @@ type recipientStruct struct {
 	Name    string `xml:"name"`
 }
 
-//----- Shared Structs -----
-type stateStruct struct {
-	Code     string `xml:"code"`
-	ErrorRet string `xml:"error"`
-}
-type paramsStruct struct {
-	SessionID string `xml:"sessionId"`
-	RequestID string `xml:"requestId"`
-}
-
 //----- File Attachment Struct
 type fileAssocStruct struct {
+	ImportRef  int
+	SmCallRef  string
 	FileID     string  `db:"fileid"`
 	CallRef    string  `db:"callref"`
 	DataID     string  `db:"dataid"`
@@ -464,8 +441,6 @@ func main() {
 		processCallAssociations()
 		//Process File Attachments
 		processFileAttachments()
-		//Close relevant Requests
-		processClosedCalls()
 	}
 
 	//-- End output
@@ -510,6 +485,7 @@ func processFileAttachments() {
 	}
 	//-- Iterate through file attachment records returned from SQL query:
 	// Where we have a corresponding request imported, insert file record in to recurring map for further processing
+
 	for rows.Next() {
 		//Scan current file attachment record in to struct
 		var requestAttachments fileAssocStruct
@@ -518,7 +494,6 @@ func processFileAttachments() {
 			logger(4, " Data Mapping Error: "+fmt.Sprintf("%v", err), false)
 			return
 		}
-
 		//Check to see if the file attachment matches a request that we've successfully imported
 		currSMFileCallRef, importedCallHasAttachments := arrCallsLogged[requestAttachments.CallRef]
 		if importedCallHasAttachments == true && currSMFileCallRef != "" {
@@ -528,6 +503,10 @@ func processFileAttachments() {
 			if callAlreadyMapped == false {
 				callLevel[currSMFileCallRef] = make(map[string]fileAssocStruct)
 			}
+			requestAttachments.ImportRef = len(importFiles) + 1
+			requestAttachments.SmCallRef = currSMFileCallRef
+			importFiles = append(importFiles, requestAttachments)
+
 			// Add an entry to the request map
 			currDataID := requestAttachments.DataID
 			callLevel[currSMFileCallRef][currDataID] = requestAttachments
@@ -536,13 +515,11 @@ func processFileAttachments() {
 
 	_, _, strStorageTotal, strStorageAvailable := getInstanceFreeSpace()
 	var fltStorageRequired float64
-	//callLevel is a recurring map - now iterate through this to get file attachment size information
-	for _, fileRecords := range callLevel {
-		for _, fileRecord := range fileRecords {
-			fltStorageRequired = fltStorageRequired + fileRecord.SizeU
-		}
+
+	//Iterate through importFiles to get file attachment size information
+	for _, fileRecord := range importFiles {
+		fltStorageRequired = fltStorageRequired + fileRecord.SizeU
 	}
-	//intStorageRequired := int64(fltStorageRequired)
 	strStorageRequired := convFloattoSizeStr(fltStorageRequired)
 
 	logger(6, "\n ------------ File Attachment Processing ------------", true)
@@ -563,30 +540,39 @@ func processFileAttachments() {
 	}
 	if boolProcessAttachments == true {
 		//Iterate through File Attachment records again for processing
-		logger(3, " Processing attachments for "+fmt.Sprintf("%v", len(callLevel))+" requests...", true)
-		bar := pb.StartNew(len(callLevel))
-		for callKey, fileRecords := range callLevel {
-			bar.Increment()
-			for _, fileRecord := range fileRecords {
-				//If file has .SWM extension, rename to .TXT
-				entityRequest := ""
-				fileExtension := filepath.Ext(fileRecord.FileName)
-				fileName := fileRecord.FileName
-				if fileExtension == ".swm" {
-					fileName = strings.TrimSuffix(fileName, fileExtension) + ".txt"
-				}
-				if fileRecord.UpdateID == "999999999" {
-					entityRequest = "Requests"
-				} else {
-					entityRequest = "RequestHistoricUpdateAttachments"
-				}
 
-				boolAddOK := addFileRecord(callKey, entityRequest, fileName, fileRecord)
-				if boolAddOK == true {
-					addFileContent(callKey, entityRequest, fileName, fileRecord)
-				}
+		logger(3, " Processing "+fmt.Sprintf("%v", len(importFiles))+" attachments for "+fmt.Sprintf("%v", len(callLevel))+" requests...", true)
+		bar := pb.StartNew(len(importFiles))
+
+		//fmt.Println("Maximum Request File Attachment Go Routines:", maxFileGoroutines)
+		maxGoroutinesGuard := make(chan struct{}, maxFileGoroutines)
+		for _, fileRecord := range importFiles {
+
+			maxGoroutinesGuard <- struct{}{}
+			wgFile.Add(1)
+
+			entityRequest := ""
+			objFileRecord := fileRecord
+
+			if objFileRecord.UpdateID == "999999999" {
+				entityRequest = "Requests"
+			} else {
+				entityRequest = "RequestHistoricUpdateAttachments"
 			}
+
+			go func() {
+				defer wgFile.Done()
+				time.Sleep(10 * time.Millisecond)
+
+				mutexBar.Lock()
+				bar.Increment()
+				mutexBar.Unlock()
+				addFileContent(entityRequest, objFileRecord)
+				<-maxGoroutinesGuard
+			}()
 		}
+		wgFile.Wait()
+
 		bar.FinishPrint("Request File Attachment Processing Complete")
 		logger(1, "Request File Attachment Processing Complete", false)
 	} else {
@@ -594,50 +580,16 @@ func processFileAttachments() {
 	}
 }
 
-//addFileRecord - given a Master Reference and a Slave Refernce, adds a call association record to Service Manager
-func addFileRecord(smCallRef, entityName, fileName string, fileRecord fileAssocStruct) bool {
-	if entityName == "RequestHistoricUpdateAttachments" {
-		espXmlmc.SetParam("application", appServiceManager)
-		espXmlmc.SetParam("entity", "RequestHistoricUpdateAttachments")
-		espXmlmc.OpenElement("primaryEntityData")
-		espXmlmc.OpenElement("record")
-		espXmlmc.SetParam("h_addedby", fileRecord.AddedBy)
-		espXmlmc.SetParam("h_callref", smCallRef)
-		espXmlmc.SetParam("h_compressed", fileRecord.Compressed)
-		espXmlmc.SetParam("h_dataid", fileRecord.DataID)
-		espXmlmc.SetParam("h_filename", fileName)
-		espXmlmc.SetParam("h_filetime", fileRecord.FileTime)
-		espXmlmc.SetParam("h_pk_fileid", fileRecord.FileID)
-		espXmlmc.SetParam("h_sizec", strconv.Itoa(int(fileRecord.SizeC)))
-		espXmlmc.SetParam("h_sizeu", strconv.Itoa(int(fileRecord.SizeU)))
-		espXmlmc.SetParam("h_timeadded", fileRecord.TimeAdded)
-		espXmlmc.SetParam("h_updateid", fileRecord.UpdateID)
-		espXmlmc.CloseElement("record")
-		espXmlmc.CloseElement("primaryEntityData")
-		XMLHistAtt, xmlmcErr := espXmlmc.Invoke("data", "entityAddRecord")
-		if xmlmcErr != nil {
-			log.Fatal(xmlmcErr)
-			return false
-		}
-		var xmlRespon xmlmcResponse
-		errXMLMC := xml.Unmarshal([]byte(XMLHistAtt), &xmlRespon)
-		if errXMLMC != nil {
-			logger(4, "Unable to read response from Hornbill instance for File Attachment Record Insertion:"+fmt.Sprintf("%v", errXMLMC), false)
-			return false
-		}
-		if xmlRespon.MethodResult != "ok" {
-			logger(3, "Unable to process File Attachment Record Insertion: "+xmlRespon.State.ErrorRet, false)
-			return false
-		}
-	}
-	return true
-}
-
 //decodeSWMFile - reads the email attachment from Supportworks, returns the content as a string
 func decodeSWMFile(fileEncoded string) (string, string) {
 	emailContent := ""
 	subjectLine := ""
 	//Decode SWM in to struct
+	espXmlmc, err := NewEspXmlmcSession()
+	if err != nil {
+		logger(4, "Unable to attach to XMLMC session to decode SWM.", true)
+		return emailContent, subjectLine
+	}
 	espXmlmc.SetParam("fileContent", fileEncoded)
 	XMLEmailDecoded, xmlmcErrEmail := espXmlmc.Invoke("mail", "decodeCompositeMessage")
 	if xmlmcErrEmail != nil {
@@ -655,7 +607,7 @@ func decodeSWMFile(fileEncoded string) (string, string) {
 		return emailContent, subjectLine
 	}
 
-	if xmlResponEmail.Params.Recipients == nil {
+	if xmlResponEmail.Recipients == nil {
 		logger(5, "No recipients found in mail message.", false)
 		return emailContent, subjectLine
 	}
@@ -663,7 +615,7 @@ func decodeSWMFile(fileEncoded string) (string, string) {
 	//Build string to write to text file
 	fromAddress := ""
 	toAddress := ""
-	for _, recipient := range xmlResponEmail.Params.Recipients {
+	for _, recipient := range xmlResponEmail.Recipients {
 		if recipient.Class == "from" {
 			fromAddress = recipient.Address
 		}
@@ -672,16 +624,16 @@ func decodeSWMFile(fileEncoded string) (string, string) {
 		}
 	}
 	bodyText := ""
-	if xmlResponEmail.Params.Body != "" {
-		bodyText = xmlResponEmail.Params.Body
+	if xmlResponEmail.Body != "" {
+		bodyText = xmlResponEmail.Body
 	} else {
-		bodyText = xmlResponEmail.Params.HTMLBody
+		bodyText = xmlResponEmail.HTMLBody
 	}
-	subjectLine = "Subject: " + xmlResponEmail.Params.Subject
+	subjectLine = "Subject: " + xmlResponEmail.Subject
 	emailContent = "From: " + fromAddress + "\r\n"
 	emailContent = emailContent + "To: " + toAddress + "\r\n"
-	if xmlResponEmail.Params.TimeSent != "" {
-		emailContent = emailContent + "Sent: " + epochToDateTime(xmlResponEmail.Params.TimeSent) + "\r\n"
+	if xmlResponEmail.TimeSent != "" {
+		emailContent = emailContent + "Sent: " + epochToDateTime(xmlResponEmail.TimeSent) + "\r\n"
 	}
 	emailContent = emailContent + subjectLine + "\r\n"
 	emailContent = emailContent + strings.Repeat("-", len(subjectLine)) + "\r\n"
@@ -690,7 +642,53 @@ func decodeSWMFile(fileEncoded string) (string, string) {
 }
 
 //addFileContent - reads the file attachment from Supportworks, attach to request and update content location
-func addFileContent(smCallRef, entityName, fileName string, fileRecord fileAssocStruct) bool {
+func addFileContent(entityName string, fileRecord fileAssocStruct) bool {
+	espXmlmc, sessErr := NewEspXmlmcSession()
+	if sessErr != nil {
+		logger(4, "Unable to attach to XMLMC session to add file record.", true)
+		return false
+	}
+	if entityName == "RequestHistoricUpdateAttachments" {
+		espXmlmc.SetParam("application", appServiceManager)
+		espXmlmc.SetParam("entity", "RequestHistoricUpdateAttachments")
+		espXmlmc.OpenElement("primaryEntityData")
+		espXmlmc.OpenElement("record")
+		espXmlmc.SetParam("h_addedby", fileRecord.AddedBy)
+		espXmlmc.SetParam("h_callref", fileRecord.SmCallRef)
+		espXmlmc.SetParam("h_compressed", fileRecord.Compressed)
+		espXmlmc.SetParam("h_dataid", fileRecord.DataID)
+		espXmlmc.SetParam("h_filename", fileRecord.FileName)
+		espXmlmc.SetParam("h_filetime", fileRecord.FileTime)
+		espXmlmc.SetParam("h_pk_fileid", fileRecord.FileID)
+		espXmlmc.SetParam("h_sizec", strconv.Itoa(int(fileRecord.SizeC)))
+		espXmlmc.SetParam("h_sizeu", strconv.Itoa(int(fileRecord.SizeU)))
+		espXmlmc.SetParam("h_timeadded", fileRecord.TimeAdded)
+		espXmlmc.SetParam("h_updateid", fileRecord.UpdateID)
+		espXmlmc.CloseElement("record")
+		espXmlmc.CloseElement("primaryEntityData")
+
+		var XMLSTRING = espXmlmc.GetParam()
+
+		XMLHistAtt, xmlmcErr := espXmlmc.Invoke("data", "entityAddRecord")
+		if xmlmcErr != nil {
+			logger(1, "File Attachment Record XML "+fmt.Sprintf("%s", XMLSTRING), false)
+			return false
+		}
+		var xmlRespon xmlmcResponse
+		errXMLMC := xml.Unmarshal([]byte(XMLHistAtt), &xmlRespon)
+		if errXMLMC != nil {
+			logger(4, "Unable to read response from Hornbill instance for File Attachment Record Insertion ["+fileRecord.SmCallRef+"]:"+fmt.Sprintf("%v", errXMLMC), false)
+			logger(1, "File Attachment Record XML "+fmt.Sprintf("%s", XMLSTRING), false)
+			return false
+		}
+		if xmlRespon.MethodResult != "ok" {
+			logger(4, "Unable to process File Attachment Record Insertion ["+fileRecord.SmCallRef+"]: "+xmlRespon.State.ErrorRet, false)
+			logger(1, "File Attachment Record XML "+fmt.Sprintf("%s", XMLSTRING), false)
+			return false
+		}
+		logger(1, "Historic Update File Attactment Record Insertion Success ["+fileRecord.SmCallRef+"]", false)
+	}
+
 	subFolderName := getSubFolderName(fileRecord.CallRef)
 	hostFileName := padCallRef(fileRecord.CallRef, "f", 8) + "." + padCallRef(fileRecord.DataID, "", 3)
 	fullFilePath := swImportConf.AttachmentRoot + "/" + subFolderName + "/" + hostFileName
@@ -721,7 +719,7 @@ func addFileContent(smCallRef, entityName, fileName string, fileRecord fileAssoc
 	//If using the Requests entity, set primary key to be the SM request ref
 	attPriKey := fileRecord.FileID
 	if entityName == "Requests" {
-		attPriKey = smCallRef
+		attPriKey = fileRecord.SmCallRef
 	}
 
 	fileExtension := filepath.Ext(fileRecord.FileName)
@@ -733,53 +731,67 @@ func addFileContent(smCallRef, entityName, fileName string, fileRecord fileAssoc
 		swmDecoded, subjectLine = decodeSWMFile(fileEncoded)
 		if swmDecoded != "" {
 			fileEncoded = base64.StdEncoding.EncodeToString([]byte(swmDecoded))
+			fileRecord.FileName = strings.TrimSuffix(fileRecord.FileName, fileExtension) + ".txt"
 		}
 	}
 
+	espXmlmc, sessErr2 := NewEspXmlmcSession()
+	if sessErr2 != nil {
+		logger(4, "Unable to attach to XMLMC session to add file record.", true)
+		return false
+	}
 	//File content read - add data to instance
 	espXmlmc.SetParam("application", appServiceManager)
 	espXmlmc.SetParam("entity", entityName)
 	espXmlmc.SetParam("keyValue", attPriKey)
 	espXmlmc.SetParam("folder", "/")
 	espXmlmc.OpenElement("localFile")
-	espXmlmc.SetParam("fileName", fileName)
+	espXmlmc.SetParam("fileName", fileRecord.FileName)
 	espXmlmc.SetParam("fileData", fileEncoded)
 	espXmlmc.CloseElement("localFile")
 	espXmlmc.SetParam("overwrite", "true")
+	var XMLSTRINGDATA = espXmlmc.GetParam()
 	XMLAttach, xmlmcErr := espXmlmc.Invoke("data", "entityAttachFile")
 	if xmlmcErr != nil {
-		logger(4, "Could not add Attachment File Data: "+fmt.Sprintf("%v", xmlmcErr), false)
-		log.Fatal(xmlmcErr)
+		logger(4, "Could not add Attachment File Data for ["+fileRecord.SmCallRef+"]: "+fmt.Sprintf("%v", xmlmcErr), false)
+		logger(1, "File Data Record XML "+fmt.Sprintf("%s", XMLSTRINGDATA), false)
 		return false
 	}
 	var xmlRespon xmlmcAttachmentResponse
 
 	err := xml.Unmarshal([]byte(XMLAttach), &xmlRespon)
 	if err != nil {
-		logger(4, "Could not add Attachment File Data: "+fmt.Sprintf("%v", err), false)
+		logger(4, "Could not add Attachment File Data for ["+fileRecord.SmCallRef+"]: "+fmt.Sprintf("%v", err), false)
+		logger(1, "File Data Record XML "+fmt.Sprintf("%s", XMLSTRINGDATA), false)
 	} else {
 		if xmlRespon.MethodResult != "ok" {
-			logger(4, "Could not add Attachment File Data: "+xmlRespon.State.ErrorRet, false)
+			logger(4, "Could not add Attachment File Data for ["+fileRecord.SmCallRef+"]: "+xmlRespon.State.ErrorRet, false)
+			logger(1, "File Data Record XML "+fmt.Sprintf("%s", XMLSTRINGDATA), false)
 		} else {
 			//-- If we've got a Content Location back from the API, update the file record with this
-			if xmlRespon.Params.ContentLocation != "" {
+			if xmlRespon.ContentLocation != "" {
 				strService := ""
 				strMethod := ""
+				espXmlmc, sessErr3 := NewEspXmlmcSession()
+				if sessErr3 != nil {
+					logger(4, "Unable to attach to XMLMC session to add file record.", true)
+					return false
+				}
 				if entityName == "RequestHistoricUpdateAttachments" {
 					espXmlmc.SetParam("application", appServiceManager)
 					espXmlmc.SetParam("entity", "RequestHistoricUpdateAttachments")
 					espXmlmc.OpenElement("primaryEntityData")
 					espXmlmc.OpenElement("record")
 					espXmlmc.SetParam("h_pk_fileid", fileRecord.FileID)
-					espXmlmc.SetParam("h_contentlocation", xmlRespon.Params.ContentLocation)
+					espXmlmc.SetParam("h_contentlocation", xmlRespon.ContentLocation)
 					espXmlmc.CloseElement("record")
 					espXmlmc.CloseElement("primaryEntityData")
 					strService = "data"
 					strMethod = "entityUpdateRecord"
 				} else {
-					espXmlmc.SetParam("requestId", smCallRef)
-					espXmlmc.SetParam("fileName", fileName)
-					espXmlmc.SetParam("fileSource", xmlRespon.Params.ContentLocation)
+					espXmlmc.SetParam("requestId", fileRecord.SmCallRef)
+					espXmlmc.SetParam("fileName", fileRecord.FileName)
+					espXmlmc.SetParam("fileSource", xmlRespon.ContentLocation)
 					if subjectLine != "" {
 						espXmlmc.SetParam("description", subjectLine+" - Originally added by "+fileRecord.AddedBy)
 					} else {
@@ -789,21 +801,27 @@ func addFileContent(smCallRef, entityName, fileName string, fileRecord fileAssoc
 					strService = "apps/" + appServiceManager + "/Requests"
 					strMethod = "attachFileFromServer"
 				}
+				XMLSTRINGDATA = espXmlmc.GetParam()
 				XMLContentLoc, xmlmcErrContent := espXmlmc.Invoke(strService, strMethod)
 				if xmlmcErrContent != nil {
-					log.Fatal(xmlmcErrContent)
+					logger(4, "Could not update request ["+fileRecord.SmCallRef+"] with attachment: "+fmt.Sprintf("%v", xmlmcErrContent), false)
+					logger(1, "File Data Record XML "+fmt.Sprintf("%s", XMLSTRINGDATA), false)
+					return false
 				}
 				var xmlResponLoc xmlmcResponse
 
 				err := xml.Unmarshal([]byte(XMLContentLoc), &xmlResponLoc)
 				if err != nil {
-					logger(4, "Added file data but unable to set Content Location for File Content - read response from Hornbill instance:"+fmt.Sprintf("%v", err), false)
+					logger(4, "Added file data to but unable to set Content Location on ["+fileRecord.SmCallRef+"] for File Content - read response from Hornbill instance:"+fmt.Sprintf("%v", err), false)
+					logger(1, "File Data Record XML "+fmt.Sprintf("%s", XMLSTRINGDATA), false)
 					return false
 				}
 				if xmlResponLoc.MethodResult != "ok" {
-					logger(4, "Added file data but unable to set Content Location for File Content: "+xmlResponLoc.State.ErrorRet, false)
+					logger(4, "Added file data but unable to set Content Location on ["+fileRecord.SmCallRef+"] for File Content: "+xmlResponLoc.State.ErrorRet, false)
+					logger(1, "File Data Record XML "+fmt.Sprintf("%s", XMLSTRINGDATA), false)
 					return false
 				}
+				logger(1, "File Content Added to ["+fileRecord.SmCallRef+"] Successfully", false)
 			}
 		}
 	}
@@ -877,9 +895,9 @@ func getInstanceFreeSpace() (int64, int64, string, string) {
 			logger(4, "Could not return Instance Audit Information: "+xmlRespon.State.ErrorRet, false)
 		} else {
 			//-- Check Response
-			if xmlRespon.Params.TotalStorage > 0 && xmlRespon.Params.TotalStorageUsed > 0 {
-				fltTotalSpace = xmlRespon.Params.TotalStorage
-				fltFreeSpace = xmlRespon.Params.TotalStorage - xmlRespon.Params.TotalStorageUsed
+			if xmlRespon.TotalStorage > 0 && xmlRespon.TotalStorageUsed > 0 {
+				fltTotalSpace = xmlRespon.TotalStorage
+				fltFreeSpace = xmlRespon.TotalStorage - xmlRespon.TotalStorageUsed
 				strTotalSpace = convFloattoSizeStr(fltTotalSpace)
 				strFreeSpace = convFloattoSizeStr(fltFreeSpace)
 			}
@@ -917,26 +935,39 @@ func processCallAssociations() {
 		return
 	}
 	//Process each association record, insert in to Hornbill
+	//fmt.Println("Maximum Request Association Go Routines:", maxGoroutines)
+	maxGoroutinesGuard := make(chan struct{}, maxGoroutines)
 	for rows.Next() {
 		var requestRels reqRelStruct
-		err = rows.StructScan(&requestRels)
-		if err != nil {
-			logger(4, " Data Mapping Error: "+fmt.Sprintf("%v", err), false)
+
+		errDataMap := rows.StructScan(&requestRels)
+		if errDataMap != nil {
+			logger(4, " Data Mapping Error: "+fmt.Sprintf("%v", errDataMap), false)
 			return
 		}
 		smMasterRef, mrOK := arrCallsLogged[requestRels.MasterRef]
 		smSlaveRef, srOK := arrCallsLogged[requestRels.SlaveRef]
-
-		if mrOK == true && smMasterRef != "" && srOK == true && smSlaveRef != "" {
-			//We have Master and Slave calls matched in the SM database
-			addAssocRecord(smMasterRef, smSlaveRef)
-		}
+		maxGoroutinesGuard <- struct{}{}
+		wgAssoc.Add(1)
+		go func() {
+			defer wgAssoc.Done()
+			if mrOK == true && smMasterRef != "" && srOK == true && smSlaveRef != "" {
+				//We have Master and Slave calls matched in the SM database
+				addAssocRecord(smMasterRef, smSlaveRef)
+			}
+			<-maxGoroutinesGuard
+		}()
 	}
+	wgAssoc.Wait()
 	logger(1, "Request Association Processing Complete", true)
 }
 
 //addAssocRecord - given a Master Reference and a Slave Refernce, adds a call association record to Service Manager
 func addAssocRecord(masterRef, slaveRef string) {
+	espXmlmc, err := NewEspXmlmcSession()
+	if err != nil {
+		return
+	}
 	espXmlmc.SetParam("application", appServiceManager)
 	espXmlmc.SetParam("entity", "RelatedRequests")
 	espXmlmc.OpenElement("primaryEntityData")
@@ -963,91 +994,49 @@ func addAssocRecord(masterRef, slaveRef string) {
 }
 
 //processCallData - Query Supportworks call data, process accordingly
-func processCallData() bool {
-	boolCallDataSuccess := false
+func processCallData() {
 	if queryDBCallDetails(mapGenericConf.CallClass, connStrAppDB) == true {
 		bar := pb.StartNew(len(arrCallDetailsMaps))
 		//We have Call Details - insert them in to
-		fmt.Println("Go Routines", maxGoroutines)
-		maxGoroutinesGaurd := make(chan struct{}, maxGoroutines)
+		//fmt.Println("Maximum Request Go Routines:", maxGoroutines)
+		maxGoroutinesGuard := make(chan struct{}, maxGoroutines)
 		for _, callRecord := range arrCallDetailsMaps {
-			maxGoroutinesGaurd <- struct{}{}
-			wg2.Add(1)
+			maxGoroutinesGuard <- struct{}{}
+			wgRequest.Add(1)
 			callRecordArr := callRecord
 			callRecordCallref := callRecord["callref"]
 
 			go func() {
-				defer wg2.Done()
+				defer wgRequest.Done()
 				time.Sleep(1 * time.Millisecond)
-				mutex.Lock()
+				mutexBar.Lock()
 				bar.Increment()
-				mutex.Unlock()
-				callID := fmt.Sprintf("%s", callRecordCallref)
+				mutexBar.Unlock()
+				//callID := fmt.Sprintf("%s", callRecordCallref)
+				callID := ""
+				if callInt, ok := callRecordCallref.(int64); ok {
+					callID = strconv.FormatInt(callInt, 10)
+				} else {
+					callID = fmt.Sprintf("%s", callRecordCallref)
+				}
+
 				currentCallRef := padCallRef(callID, "F", 7)
 
 				boolCallLogged, hbCallRef := logNewCall(mapGenericConf.CallClass, callRecordArr, callID)
 				if boolCallLogged {
 					logger(3, "[REQUEST LOGGED] Request logged successfully: "+hbCallRef+" from Supportworks call "+currentCallRef, false)
-					boolCallDataSuccess = true
 				} else {
 					logger(4, mapGenericConf.CallClass+" call log failed: "+currentCallRef, false)
 				}
-				<-maxGoroutinesGaurd
+				<-maxGoroutinesGuard
 			}()
 		}
-		wg2.Wait()
+		wgRequest.Wait()
 
 		bar.FinishPrint(mapGenericConf.CallClass + " Call Import Complete")
 	} else {
 		logger(4, "Call Search Failed for Call Class: "+mapGenericConf.CallClass, true)
 	}
-	return boolCallDataSuccess
-}
-
-//processClosedCalls - closes all relevant requests when logging process complete
-// - This is to ensure that closed calls have file attachments associated, which cannot be done at point of logging
-func processClosedCalls() {
-
-	fmt.Println("Go Routines", maxGoroutines)
-	maxGoroutinesGaurd := make(chan struct{}, maxGoroutines)
-
-	for callref := range arrClosedCalls {
-		maxGoroutinesGaurd <- struct{}{}
-		wg.Add(1)
-		mutex.Lock()
-		callrefLocal := callref
-		mutex.Unlock()
-		go func() {
-			defer wg.Done()
-			currSMFileCallRef, importedCallToClose := arrCallsLogged[callrefLocal]
-			if importedCallToClose == true {
-				//Close the current call!
-				espXmlmc.SetParam("requestID", currSMFileCallRef)
-				XMLClose, xmlmcErr := espXmlmc.Invoke("apps/"+appServiceManager+"/Requests", "closeRequest")
-				if xmlmcErr != nil {
-					log.Fatal(xmlmcErr)
-					<-maxGoroutinesGaurd
-					return
-				}
-				var xmlRespon xmlmcResponse
-				err := xml.Unmarshal([]byte(XMLClose), &xmlRespon)
-				if err != nil {
-					logger(4, "Unable to read response from Hornbill instance to close request "+currSMFileCallRef+":"+fmt.Sprintf("%v", err), false)
-					<-maxGoroutinesGaurd
-					return
-				}
-				if xmlRespon.MethodResult != "ok" {
-					logger(4, "Unable to close request "+currSMFileCallRef+": "+xmlRespon.State.ErrorRet, false)
-					<-maxGoroutinesGaurd
-					return
-				}
-			}
-
-			<-maxGoroutinesGaurd
-		}()
-	}
-	wg.Wait()
-	return
 }
 
 //queryDBCallDetails -- Query call data & set map of calls to add to Hornbill
@@ -1099,266 +1088,342 @@ func queryDBCallDetails(callClass, connString string) bool {
 //logNewCall - Function takes Supportworks call data in a map, and logs to Hornbill
 func logNewCall(callClass string, callMap map[string]interface{}, swCallID string) (bool, string) {
 
-	espXmlmc, err := NewEspXmlmcSession()
-	if err != nil {
-		return false, "Unable to create Session"
-	}
-
-	defer EspXmlmcSessiondDestroy(espXmlmc)
 	boolCallLoggedOK := false
-	boolAssignToDefault := false
 	strNewCallRef := ""
-	//-- Get site ID
-	siteID, siteName := getSiteID(callMap)
-	//-- Get Priority ID
-	strPriorityID, strPriorityName := getCallPriorityID(callMap)
-	if strPriorityID == "" && mapGenericConf.DefaultPriority != "" {
-		strPriorityID = getPriorityID(mapGenericConf.DefaultPriority)
-		strPriorityName = mapGenericConf.DefaultPriority
-	}
-	//-- Get Team ID
-	strTeamID := getCallTeamID(callMap)
-	if strTeamID == "" && mapGenericConf.DefaultTeam != "" {
-		strTeamID = getTeamID(mapGenericConf.DefaultTeam)
-		if strTeamID != "" {
-			boolAssignToDefault = true
-		}
-	}
-	//-- Get Call Category ID
-	strCategoryID := getCallCategoryID(callMap, "Request")
 
-	//-- Get Owner ID
-	strOwnerID := ""
-	ownerMapping := fmt.Sprintf("%v", mapGenericConf.CoreFieldMapping["ownerId"])
-	if ownerMapping != "" {
-		strOwnerID = getFieldValue(ownerMapping, callMap)
-	}
-	//-- Get Service ID
-	strServiceID := getCallServiceID(callMap)
-	if strServiceID == "" && mapGenericConf.DefaultService != "" {
-		strServiceID = getServiceID(mapGenericConf.DefaultService)
-	}
-	//-- Get Summary Text
-	strSummary := ""
-	summaryMapping := fmt.Sprintf("%v", mapGenericConf.CoreFieldMapping["summary"])
-	if summaryMapping != "" {
-		strSummary = getFieldValue(summaryMapping, callMap)
-	}
-	//-- Get Description Text
-	strDescription := ""
-	descriptionMapping := fmt.Sprintf("%v", mapGenericConf.CoreFieldMapping["description"])
-	if descriptionMapping != "" {
-		strDescription = getFieldValue(descriptionMapping, callMap)
-	}
-	//-- Get Request Status
 	strStatus := ""
-	statusMapping := fmt.Sprintf("%v", mapGenericConf.CoreFieldMapping["status"])
+	statusMapping := fmt.Sprintf("%v", mapGenericConf.CoreFieldMapping["h_status"])
 	if statusMapping != "" {
 		if statusMapping == "16" || statusMapping == "18" {
 			strStatus = arrSWStatus["6"]
-			arrClosedCalls[swCallID] = statusMapping
 		} else {
 			strStatus = arrSWStatus[getFieldValue(statusMapping, callMap)]
 		}
 	}
-	//-- Get Customer ID
-	strCustID := ""
-	custIDMapping := fmt.Sprintf("%v", mapGenericConf.CoreFieldMapping["customerId"])
-	if custIDMapping != "" {
-		strCustID = getFieldValue(custIDMapping, callMap)
+
+	espXmlmc, err := NewEspXmlmcSession()
+	if err != nil {
+		return false, ""
 	}
-	//-- Get Customer Type
-	strCustType := "1"
-	custTypeMapping := fmt.Sprintf("%v", mapGenericConf.CoreFieldMapping["customerType"])
-	if custTypeMapping != "" {
-		strCustType = getFieldValue(custTypeMapping, callMap)
+
+	espXmlmc.SetParam("application", appServiceManager)
+	espXmlmc.SetParam("entity", "Requests")
+	espXmlmc.SetParam("returnModifiedData", "true")
+	espXmlmc.OpenElement("primaryEntityData")
+	espXmlmc.OpenElement("record")
+	strAttribute := ""
+	strMapping := ""
+	strServiceBPM := ""
+	//Loop through core fields from config, add to XMLMC Params
+	for k, v := range mapGenericConf.CoreFieldMapping {
+		boolAutoProcess := true
+		strAttribute = fmt.Sprintf("%v", k)
+		strMapping = fmt.Sprintf("%v", v)
+
+		//Owning Analyst Name
+		if strAttribute == "h_ownerid" {
+			strOwnerID := getFieldValue(strMapping, callMap)
+			if strOwnerID != "" {
+				boolAnalystExists := doesAnalystExist(strOwnerID)
+				if boolAnalystExists {
+					//Get analyst from cache as exists
+					analystIsInCache, strOwnerName := recordInCache(strOwnerID, "Analyst")
+					if analystIsInCache && strOwnerName != "" {
+						espXmlmc.SetParam(strAttribute, strOwnerID)
+						espXmlmc.SetParam("h_ownername", strOwnerName)
+					}
+				}
+			}
+			boolAutoProcess = false
+		}
+
+		//Customer ID & Name
+		if strAttribute == "h_fk_user_id" {
+			strCustID := getFieldValue(strMapping, callMap)
+			if strCustID != "" {
+				boolCustExists := doesCustomerExist(strCustID)
+				if boolCustExists {
+					//Get customer from cache as exists
+					customerIsInCache, strCustName := recordInCache(strCustID, "Customer")
+					if customerIsInCache && strCustName != "" {
+						espXmlmc.SetParam(strAttribute, strCustID)
+						espXmlmc.SetParam("h_fk_user_name", strCustName)
+					}
+				}
+			}
+			boolAutoProcess = false
+		}
+
+		//Priority ID & Name
+		//-- Get Priority ID
+		if strAttribute == "h_fk_priorityid" {
+			strPriorityID, strPriorityName := getCallPriorityID(callMap)
+			if strPriorityID == "" && mapGenericConf.DefaultPriority != "" {
+				strPriorityID = getPriorityID(mapGenericConf.DefaultPriority)
+				strPriorityName = mapGenericConf.DefaultPriority
+			}
+			espXmlmc.SetParam(strAttribute, strPriorityID)
+			espXmlmc.SetParam("h_fk_priorityname", strPriorityName)
+			boolAutoProcess = false
+		}
+
+		// Category ID & Name
+		if strAttribute == "h_category_id" && strMapping != "" {
+			//-- Get Call Category ID
+			strCategoryID, strCategoryName := getCallCategoryID(callMap, "Request")
+			if strCategoryID != "" && strCategoryName != "" {
+				espXmlmc.SetParam(strAttribute, strCategoryID)
+				espXmlmc.SetParam("h_category", strCategoryID)
+			}
+			boolAutoProcess = false
+		}
+
+		// Closure Category ID & Name
+		if strAttribute == "h_closure_category_id" && strMapping != "" {
+			strClosureCategoryID, strClosureCategoryName := getCallCategoryID(callMap, "Closure")
+			if strClosureCategoryID != "" {
+				espXmlmc.SetParam(strAttribute, strClosureCategoryID)
+				espXmlmc.SetParam("h_closure_category", strClosureCategoryName)
+			}
+			boolAutoProcess = false
+		}
+
+		// Service ID & Name, & BPM Workflow
+		if strAttribute == "h_fk_serviceid" {
+			//-- Get Service ID
+			strServiceID := getCallServiceID(callMap)
+			if strServiceID == "" && mapGenericConf.DefaultService != "" {
+				strServiceID = getServiceID(mapGenericConf.DefaultService)
+			}
+			if strServiceID != "" {
+				//-- Get record from Service Cache
+				strServiceName := ""
+				mutexServices.Lock()
+				for _, service := range services {
+					if strconv.Itoa(service.ServiceID) == strServiceID {
+						strServiceName = service.ServiceName
+						switch callClass {
+						case "Incident":
+							strServiceBPM = service.ServiceBPMIncident
+						case "Service Request":
+							strServiceBPM = service.ServiceBPMService
+						case "Change Request":
+							strServiceBPM = service.ServiceBPMChange
+						case "Problem":
+							strServiceBPM = service.ServiceBPMProblem
+						case "Known Error":
+							strServiceBPM = service.ServiceBPMKnownError
+						}
+					}
+				}
+				mutexServices.Unlock()
+
+				if strServiceName != "" {
+					espXmlmc.SetParam(strAttribute, strServiceID)
+					espXmlmc.SetParam("h_fk_servicename", strServiceName)
+				}
+			}
+			boolAutoProcess = false
+		}
+
+		// Request Status
+		if strAttribute == "h_status" {
+			espXmlmc.SetParam(strAttribute, strStatus)
+			boolAutoProcess = false
+		}
+
+		// Team ID and Name
+		if strAttribute == "h_fk_team_id" {
+			//-- Get Team ID
+			strTeamID, strTeamName := getCallTeamID(callMap)
+			if strTeamID == "" && mapGenericConf.DefaultTeam != "" {
+				strTeamName = mapGenericConf.DefaultTeam
+				strTeamID = getTeamID(strTeamName)
+			}
+			if strTeamID != "" && strTeamName != "" {
+				espXmlmc.SetParam(strAttribute, strTeamID)
+				espXmlmc.SetParam("h_fk_team_name", strTeamName)
+			}
+			boolAutoProcess = false
+		}
+
+		// Site ID and Name
+		if strAttribute == "h_site_id" {
+			//-- Get site ID
+			siteID, siteName := getSiteID(callMap)
+			if siteID != "" && siteName != "" {
+				espXmlmc.SetParam(strAttribute, siteID)
+				espXmlmc.SetParam("h_site", siteName)
+			}
+			boolAutoProcess = false
+		}
+
+		//Everything Else
+		if boolAutoProcess &&
+			strAttribute != "h_category" &&
+			strAttribute != "h_closure_category" &&
+			strAttribute != "h_fk_servicename" &&
+			strAttribute != "h_fk_team_name" &&
+			strAttribute != "h_site" &&
+			strAttribute != "h_fk_priorityname" &&
+			strAttribute != "h_ownername" &&
+			strAttribute != "h_fk_user_name" {
+
+			if strMapping != "" && getFieldValue(strMapping, callMap) != "" {
+				espXmlmc.SetParam(strAttribute, getFieldValue(strMapping, callMap))
+			}
+		}
+
 	}
-	//-- Get Impact
-	strImpact := ""
-	impactMapping := fmt.Sprintf("%v", mapGenericConf.CoreFieldMapping["impact"])
-	if impactMapping != "" {
-		strImpact = getFieldValue(impactMapping, callMap)
+
+	//Add call class
+	espXmlmc.SetParam("h_requesttype", callClass)
+
+	//Using call class, add Call Prefix
+	strCallPrefix := ""
+	switch callClass {
+	case "Incident":
+		strCallPrefix = "IN"
+	case "Service Request":
+		strCallPrefix = "SR"
+	case "Change Request":
+		strCallPrefix = "CR"
+	case "Problem":
+		strCallPrefix = "PM"
+	case "Known Error":
+		strCallPrefix = "KE"
 	}
-	//-- Get Urgency
-	strUrgency := ""
-	urgencyMapping := fmt.Sprintf("%v", mapGenericConf.CoreFieldMapping["urgency"])
-	if urgencyMapping != "" {
-		strUrgency = getFieldValue(urgencyMapping, callMap)
-	}
-	//-- Get Change Type
-	strChangeType := ""
-	if callClass == "Change Request" {
-		changeTypeMapping := fmt.Sprintf("%v", mapGenericConf.CoreFieldMapping["changeType"])
-		if changeTypeMapping != "" {
-			strChangeType = getFieldValue(changeTypeMapping, callMap)
+	espXmlmc.SetParam("h_request_prefix", strCallPrefix)
+
+	espXmlmc.CloseElement("record")
+	espXmlmc.CloseElement("primaryEntityData")
+
+	//Class Specific Data Insert
+	espXmlmc.OpenElement("relatedEntityData")
+	espXmlmc.SetParam("relationshipName", "Call Type")
+	espXmlmc.SetParam("entityAction", "insert")
+	espXmlmc.OpenElement("record")
+	strAttribute = ""
+	strMapping = ""
+	//Loop through AdditionalFieldMapping fields from config, add to XMLMC Params if not empty
+	for k, v := range mapGenericConf.AdditionalFieldMapping {
+		strAttribute = fmt.Sprintf("%v", k)
+		strMapping = fmt.Sprintf("%v", v)
+		if strMapping != "" && getFieldValue(strMapping, callMap) != "" {
+			espXmlmc.SetParam(strAttribute, getFieldValue(strMapping, callMap))
 		}
 	}
 
-	//Set Params for new request log XMLMC call
-	if strSummary != "" {
-		espXmlmc.SetParam("summary", strSummary)
-	}
-	if strDescription != "" {
-		espXmlmc.SetParam("description", strDescription)
-	}
-	espXmlmc.SetParam("requestType", callClass)
-	if strCustID != "" {
-		espXmlmc.SetParam("customerId", strCustID)
-	}
-	espXmlmc.SetParam("customerType", strCustType)
-	if strStatus != "" {
-		espXmlmc.SetParam("status", strStatus)
-	}
-	if strCategoryID != "" {
-		espXmlmc.SetParam("categoryId", strCategoryID)
-	}
-	if strImpact != "" {
-		espXmlmc.SetParam("impact", strImpact)
-	}
-	if strUrgency != "" {
-		espXmlmc.SetParam("urgency", strUrgency)
-	}
-	if strServiceID != "" {
-		espXmlmc.SetParam("serviceId", strServiceID)
-	}
-	if strChangeType != "" {
-		espXmlmc.SetParam("changeType", strChangeType)
-	}
-	if siteID != "" && siteName != "" {
-		espXmlmc.SetParam("siteId", siteID)
-		espXmlmc.SetParam("siteName", siteName)
-	}
+	espXmlmc.CloseElement("record")
+	espXmlmc.CloseElement("relatedEntityData")
+
 	//-- Check for Dry Run
 	if configDryRun != true {
-		//Set the Service and Method for the XMLMC call
-		strService := ""
-		strMethod := ""
-		switch callClass {
-		case "Incident":
-			strService = "Incidents"
-			strMethod = "logIncident"
-		case "Service Request":
-			strService = "ServiceRequests"
-			strMethod = "logServiceRequest"
-		case "Change Request":
-			strService = "ChangeRequests"
-			strMethod = "logChangeRequest"
-		case "Problem":
-			strService = "Problems"
-			strMethod = "logProblem"
-		case "Known Error":
-			strService = "KnownErrors"
-			strMethod = "logKnownError"
-		}
 
-		XMLCreate, xmlmcErr := espXmlmc.Invoke("apps/"+appServiceManager+"/"+strService, strMethod)
+		XMLCreate, xmlmcErr := espXmlmc.Invoke("data", "entityAddRecord")
 		if xmlmcErr != nil {
 			log.Fatal(xmlmcErr)
 		}
-		var xmlRespon xmlmcResponse
+		var xmlRespon xmlmcRequestResponseStruct
 
 		err := xml.Unmarshal([]byte(XMLCreate), &xmlRespon)
 		if err != nil {
+			counters.Lock()
 			counters.createdSkipped++
+			counters.Unlock()
 			logger(4, "Unable to read response from Hornbill instance:"+fmt.Sprintf("%v", err), false)
 			return false, "No"
 		}
 		if xmlRespon.MethodResult != "ok" {
 			logger(4, "Unable to log request: "+xmlRespon.State.ErrorRet, false)
+			counters.Lock()
 			counters.createdSkipped++
+			counters.Unlock()
 		} else {
-			strNewCallRef = xmlRespon.Params.RequestID
+			strNewCallRef = xmlRespon.RequestID
+
+			mutexArrCallsLogged.Lock()
 			arrCallsLogged[swCallID] = strNewCallRef
+			mutexArrCallsLogged.Unlock()
+
+			counters.Lock()
 			counters.created++
+			counters.Unlock()
 			boolCallLoggedOK = true
+			//Now do BPM Processing
+			if strStatus != "status.resolved" &&
+				strStatus != "status.closed" &&
+				strStatus != "status.cancelled" {
+
+				logger(1, callClass+" Logged: "+strNewCallRef+". Open Request status, spawing BPM Process "+strServiceBPM, false)
+				if strNewCallRef != "" && strServiceBPM != "" {
+					espXmlmc.SetParam("application", appServiceManager)
+					espXmlmc.SetParam("name", strServiceBPM)
+					espXmlmc.OpenElement("inputParams")
+					espXmlmc.SetParam("objectRefUrn", "urn:sys:entity:"+appServiceManager+":Requests:"+strNewCallRef)
+					espXmlmc.SetParam("requestId", strNewCallRef)
+					espXmlmc.CloseElement("inputParams")
+
+					XMLBPM, xmlmcErr := espXmlmc.Invoke("bpm", "processSpawn")
+					if xmlmcErr != nil {
+						log.Fatal(xmlmcErr)
+					}
+					var xmlRespon xmlmcBPMSpawnedStruct
+
+					errBPM := xml.Unmarshal([]byte(XMLBPM), &xmlRespon)
+					if errBPM != nil {
+						logger(4, "Unable to read response from Hornbill instance:"+fmt.Sprintf("%v", errBPM), false)
+						return false, "No"
+					}
+					if xmlRespon.MethodResult != "ok" {
+						logger(4, "Unable to invoke BPM: "+xmlRespon.State.ErrorRet, false)
+					} else {
+						//Now, associate spawned BPM to the new Request
+						espXmlmc.SetParam("application", appServiceManager)
+						espXmlmc.SetParam("entity", "Requests")
+						espXmlmc.OpenElement("primaryEntityData")
+						espXmlmc.OpenElement("record")
+						espXmlmc.SetParam("h_pk_reference", strNewCallRef)
+						espXmlmc.SetParam("h_bpm_id", xmlRespon.Identifier)
+						espXmlmc.CloseElement("record")
+						espXmlmc.CloseElement("primaryEntityData")
+
+						XMLBPMUpdate, xmlmcErr := espXmlmc.Invoke("data", "entityUpdateRecord")
+						if xmlmcErr != nil {
+							log.Fatal(xmlmcErr)
+						}
+						var xmlRespon xmlmcResponse
+
+						errBPMSpawn := xml.Unmarshal([]byte(XMLBPMUpdate), &xmlRespon)
+						if errBPMSpawn != nil {
+							logger(4, "Unable to read response from Hornbill instance:"+fmt.Sprintf("%v", errBPMSpawn), false)
+							return false, "No"
+						}
+						if xmlRespon.MethodResult != "ok" {
+							logger(4, "Unable to associate BPM to Request: "+xmlRespon.State.ErrorRet, false)
+						}
+					}
+				}
+			}
 		}
 	} else {
 		//-- DEBUG XML TO LOG FILE
 		var XMLSTRING = espXmlmc.GetParam()
 		logger(1, "Request Log XML "+fmt.Sprintf("%s", XMLSTRING), false)
+		counters.Lock()
 		counters.createdSkipped++
+		counters.Unlock()
 		espXmlmc.ClearParam()
 		return true, "Dry Run"
 	}
 
 	//-- If request logged successfully :
-	// Assign the Call to the Group/Analyst specified by the source call mapping or default value
-	// Set the Priority on the call, from the source call mapping or default value
-	// The above 2 are done outside of the original call logging, to prevent the possibility
-	// of BPM Workflow errors
-	//Then cycle through the additional call column mapping and update the parent call record
-	//And finally get the Call Diary Updates from Supportworks and build the Historical Updates against the SM request
+	//Get the Call Diary Updates from Supportworks and build the Historical Updates against the SM request
 	if boolCallLoggedOK == true && strNewCallRef != "" {
-		if strTeamID != "" {
-			assignCall(strNewCallRef, strOwnerID, strTeamID, boolAssignToDefault)
-		}
-		if strPriorityID != "" {
-			setPriority(strNewCallRef, strPriorityID, strPriorityName)
-		}
-
-		updateExtraRequestCols(strNewCallRef, callMap, swCallID)
 		applyHistoricalUpdates(strNewCallRef, swCallID)
 	}
 
 	return boolCallLoggedOK, strNewCallRef
-}
-
-//updateExtraRequestCols - takes additional mapping from config, updates call record accordingly
-func updateExtraRequestCols(newCallRef string, callMap map[string]interface{}, swCallID string) bool {
-	boolUpdateRequest := false
-	strAttribute := ""
-	strMapping := ""
-	espXmlmc, err := NewEspXmlmcSession()
-	if err != nil {
-		return false
-	}
-	defer EspXmlmcSessiondDestroy(espXmlmc)
-	espXmlmc.SetParam("application", appServiceManager)
-	espXmlmc.SetParam("entity", "Requests")
-	espXmlmc.OpenElement("primaryEntityData")
-	espXmlmc.OpenElement("record")
-	espXmlmc.SetParam("h_pk_reference", newCallRef)
-	for k, v := range mapGenericConf.AdditionalFieldMapping {
-		strAttribute = fmt.Sprintf("%v", k)
-		strMapping = fmt.Sprintf("%v", v)
-
-		if strAttribute == "h_closure_category_id" && strMapping != "" {
-			strClosureCategoryID := getCallCategoryID(callMap, "Closure")
-			if strClosureCategoryID != "" {
-				boolUpdateRequest = true
-				espXmlmc.SetParam(strAttribute, strClosureCategoryID)
-			}
-		}
-
-		if strMapping != "" && getFieldValue(strMapping, callMap) != "" {
-			boolUpdateRequest = true
-			espXmlmc.SetParam(strAttribute, getFieldValue(strMapping, callMap))
-		}
-	}
-
-	if boolUpdateRequest == false {
-		espXmlmc.ClearParam()
-		return false
-	}
-	espXmlmc.CloseElement("record")
-	espXmlmc.CloseElement("primaryEntityData")
-	XMLCreate, xmlmcErr := espXmlmc.Invoke("data", "entityUpdateRecord")
-	if xmlmcErr != nil {
-		log.Fatal(xmlmcErr)
-		return false
-	}
-	var xmlRespon xmlmcResponse
-
-	err = xml.Unmarshal([]byte(XMLCreate), &xmlRespon)
-	if err != nil {
-		logger(4, "Unable to read response from Hornbill instance:"+fmt.Sprintf("%v", err), false)
-		return false
-	}
-	if xmlRespon.MethodResult != "ok" {
-		logger(4, "Unable to update request extended columns: "+xmlRespon.State.ErrorRet, false)
-		return false
-	}
-	return true
 }
 
 //applyHistoricalUpdates - takes call diary records from Supportworks, imports to Hornbill as Historical Updates
@@ -1367,7 +1432,7 @@ func applyHistoricalUpdates(newCallRef, swCallRef string) bool {
 	if err != nil {
 		return false
 	}
-	defer EspXmlmcSessiondDestroy(espXmlmc)
+
 	//Connect to the JSON specified DB
 	db, err := sqlx.Open(appDBDriver, connStrAppDB)
 	defer db.Close()
@@ -1382,12 +1447,13 @@ func applyHistoricalUpdates(newCallRef, swCallRef string) bool {
 		return false
 	}
 	logger(3, "[DATABASE] Connection Successful", false)
+	mutex.Lock()
 	logger(3, "[DATABASE] Running query for Historical Updates of call "+swCallRef+". Please wait...", false)
-
 	//build query
 	sqlDiaryQuery := "SELECT updatetimex, repid, groupid, udsource, udcode, udtype, updatetxt, udindex, timespent "
 	sqlDiaryQuery = sqlDiaryQuery + " FROM updatedb WHERE callref = " + swCallRef + " ORDER BY udindex ASC"
 	logger(3, "[DATABASE} Diary Query: "+sqlDiaryQuery, false)
+	mutex.Unlock()
 	//Run Query
 	rows, err := db.Queryx(sqlDiaryQuery)
 	if err != nil {
@@ -1402,7 +1468,13 @@ func applyHistoricalUpdates(newCallRef, swCallRef string) bool {
 			logger(4, "Unable to retrieve data from SQL query: "+fmt.Sprintf("%v", err), false)
 		} else {
 			//Update Time - EPOCH to Date/Time Conversion
-			diaryTimex := fmt.Sprintf("%+s", diaryEntry["updatetimex"])
+			diaryTimex := ""
+			if updateTime, ok := diaryEntry["updatetimex"].(int64); ok {
+				diaryTimex = strconv.FormatInt(updateTime, 10)
+			} else {
+				diaryTimex = fmt.Sprintf("%+s", diaryEntry["updatetimex"])
+			}
+
 			diaryTime := epochToDateTime(diaryTimex)
 
 			//Check for source/code/text having nil value
@@ -1420,21 +1492,41 @@ func applyHistoricalUpdates(newCallRef, swCallRef string) bool {
 				diaryText = html.EscapeString(diaryText)
 			}
 
+			diaryIndex := ""
+			if updateIndex, ok := diaryEntry["udindex"].(int64); ok {
+				diaryIndex = strconv.FormatInt(updateIndex, 10)
+			} else {
+				diaryIndex = fmt.Sprintf("%+s", diaryEntry["udindex"])
+			}
+
+			diaryTimeSpent := ""
+			if updateSpent, ok := diaryEntry["timespent"].(int64); ok {
+				diaryTimeSpent = strconv.FormatInt(updateSpent, 10)
+			} else {
+				diaryTimeSpent = fmt.Sprintf("%+s", diaryEntry["timespent"])
+			}
+
+			diaryType := ""
+			if updateType, ok := diaryEntry["udtype"].(int64); ok {
+				diaryType = strconv.FormatInt(updateType, 10)
+			} else {
+				diaryType = fmt.Sprintf("%+s", diaryEntry["udtype"])
+			}
+
 			espXmlmc.SetParam("application", appServiceManager)
 			espXmlmc.SetParam("entity", "RequestHistoricUpdates")
 			espXmlmc.OpenElement("primaryEntityData")
 			espXmlmc.OpenElement("record")
 			espXmlmc.SetParam("h_fk_reference", newCallRef)
 			espXmlmc.SetParam("h_updatedate", diaryTime)
-			intDiaryTimeSpent, _ := strconv.Atoi(fmt.Sprintf("%+s", diaryEntry["timespent"]))
-			if intDiaryTimeSpent > 0 {
-				espXmlmc.SetParam("h_timespent", fmt.Sprintf("%+s", diaryEntry["timespent"]))
+			if diaryTimeSpent != "" && diaryTimeSpent != "0" {
+				espXmlmc.SetParam("h_timespent", diaryTimeSpent)
 			}
-			if fmt.Sprintf("%+s", diaryEntry["udtype"]) != "" {
-				espXmlmc.SetParam("h_updatetype", fmt.Sprintf("%+s", diaryEntry["udtype"]))
+			if diaryType != "" {
+				espXmlmc.SetParam("h_updatetype", diaryType)
 			}
 			espXmlmc.SetParam("h_updatebytype", "1")
-			espXmlmc.SetParam("h_updateindex", fmt.Sprintf("%+s", diaryEntry["udindex"]))
+			espXmlmc.SetParam("h_updateindex", diaryIndex)
 			espXmlmc.SetParam("h_updateby", fmt.Sprintf("%+s", diaryEntry["repid"]))
 			espXmlmc.SetParam("h_updatebyname", fmt.Sprintf("%+s", diaryEntry["repid"]))
 			espXmlmc.SetParam("h_updatebygroup", fmt.Sprintf("%+s", diaryEntry["groupid"]))
@@ -1468,7 +1560,9 @@ func applyHistoricalUpdates(newCallRef, swCallRef string) bool {
 				//-- DEBUG XML TO LOG FILE
 				var XMLSTRING = espXmlmc.GetParam()
 				logger(1, "Request Historical Update XML "+fmt.Sprintf("%s", XMLSTRING), false)
+				counters.Lock()
 				counters.createdSkipped++
+				counters.Unlock()
 				espXmlmc.ClearParam()
 				return true
 			}
@@ -1476,71 +1570,6 @@ func applyHistoricalUpdates(newCallRef, swCallRef string) bool {
 	}
 	defer rows.Close()
 	return true
-}
-
-//assignCall - takes Service Manager call ref, team and analyst, and assigns call accordingly
-func assignCall(newCallRef, analystID, teamID string, boolDefaultAssign bool) (boolCallAssigned bool) {
-	espXmlmc, err := NewEspXmlmcSession()
-	if err != nil {
-		return false
-	}
-	defer EspXmlmcSessiondDestroy(espXmlmc)
-	boolDoesOwnerExist := false
-	if analystID != "" && boolDefaultAssign == false {
-		boolDoesOwnerExist = doesOwnerExist(analystID)
-	}
-	espXmlmc.SetParam("inReference", newCallRef)
-	if boolDoesOwnerExist == true {
-		espXmlmc.SetParam("inAssignToId", analystID)
-	}
-	espXmlmc.SetParam("inAssignToGroupId", teamID)
-	XMLCreate, xmlmcErr := espXmlmc.Invoke("apps/"+appServiceManager+"/Requests", "assign")
-	if xmlmcErr != nil {
-		log.Fatal(xmlmcErr)
-		return
-	}
-	var xmlRespon xmlmcResponse
-	err = xml.Unmarshal([]byte(XMLCreate), &xmlRespon)
-	if err != nil {
-		logger(4, "Unable to read response from Hornbill instance:"+fmt.Sprintf("%v", err), false)
-		return
-	}
-	if xmlRespon.MethodResult != "ok" {
-		logger(4, "Unable to assign request: "+xmlRespon.State.ErrorRet, false)
-	} else {
-		boolCallAssigned = true
-	}
-	return
-}
-
-//setPriority - takes Service Manager call ref and Priority ID, and Prioritises call accordingly
-func setPriority(newCallRef, priorityID, priorityName string) (boolPrioritised bool) {
-	espXmlmc, err := NewEspXmlmcSession()
-	if err != nil {
-		return false
-	}
-	defer EspXmlmcSessiondDestroy(espXmlmc)
-	espXmlmc.SetParam("requestId", newCallRef)
-	espXmlmc.SetParam("priorityId", priorityID)
-	espXmlmc.SetParam("priorityName", priorityName)
-	espXmlmc.SetParam("escalationNote", "Priority "+priorityName+" assigned during import process.")
-	XMLCreate, xmlmcErr := espXmlmc.Invoke("apps/"+appServiceManager+"/Requests", "escalateRequest")
-	if xmlmcErr != nil {
-		log.Fatal(xmlmcErr)
-		return
-	}
-	var xmlRespon xmlmcResponse
-	err = xml.Unmarshal([]byte(XMLCreate), &xmlRespon)
-	if err != nil {
-		logger(4, "Unable to read response from Hornbill instance:"+fmt.Sprintf("%v", err), false)
-		return
-	}
-	if xmlRespon.MethodResult != "ok" {
-		logger(4, "Unable to prioritise request: "+xmlRespon.State.ErrorRet, false)
-	} else {
-		boolPrioritised = true
-	}
-	return
 }
 
 // getFieldValue --Retrieve field value from mapping via SQL record map
@@ -1562,14 +1591,27 @@ func getFieldValue(v string, u map[string]interface{}) string {
 		if valFieldMap == "oldCallRef" {
 			valFieldMap = "h_formattedcallref"
 			if u[valFieldMap] != nil {
-				valFieldMap = fmt.Sprintf("%+s", u[valFieldMap])
+
+				if valField, ok := u[valFieldMap].(int64); ok {
+					valFieldMap = strconv.FormatInt(valField, 10)
+				} else {
+					valFieldMap = fmt.Sprintf("%+s", u[valFieldMap])
+				}
+
 				if valFieldMap != "<nil>" {
 					fieldMap = strings.Replace(fieldMap, val, valFieldMap, 1)
 				}
+
 			} else {
 				valFieldMap = "callref"
 				if u[valFieldMap] != nil {
-					valFieldMap = fmt.Sprintf("%+s", u[valFieldMap])
+
+					if valField, ok := u[valFieldMap].(int64); ok {
+						valFieldMap = strconv.FormatInt(valField, 10)
+					} else {
+						valFieldMap = fmt.Sprintf("%+s", u[valFieldMap])
+					}
+
 					if valFieldMap != "<nil>" {
 						fieldMap = strings.Replace(fieldMap, val, padCallRef(valFieldMap, "F", 7), 1)
 					}
@@ -1579,7 +1621,13 @@ func getFieldValue(v string, u map[string]interface{}) string {
 			}
 		} else {
 			if u[valFieldMap] != nil {
-				valFieldMap = fmt.Sprintf("%+s", u[valFieldMap])
+
+				if valField, ok := u[valFieldMap].(int64); ok {
+					valFieldMap = strconv.FormatInt(valField, 10)
+				} else {
+					valFieldMap = fmt.Sprintf("%+s", u[valFieldMap])
+				}
+
 				if valFieldMap != "<nil>" {
 					fieldMap = strings.Replace(fieldMap, val, valFieldMap, 1)
 				}
@@ -1681,7 +1729,7 @@ func getPriorityID(priorityName string) string {
 }
 
 //getCallTeamID takes the Call Record and returns a correct Team ID if one exists on the Instance
-func getCallTeamID(callMap map[string]interface{}) string {
+func getCallTeamID(callMap map[string]interface{}) (string, string) {
 	teamID := ""
 	teamNameMapping := fmt.Sprintf("%v", mapGenericConf.CoreFieldMapping["teamId"])
 	teamName := getFieldValue(teamNameMapping, callMap)
@@ -1691,7 +1739,7 @@ func getCallTeamID(callMap map[string]interface{}) string {
 			teamID = getTeamID(teamName)
 		}
 	}
-	return teamID
+	return teamID, teamName
 }
 
 //getTeamID takes a Team Name string and returns a correct Team ID if one exists in the cache or on the Instance
@@ -1714,103 +1762,162 @@ func getTeamID(teamName string) string {
 }
 
 //getCallCategoryID takes the Call Record and returns a correct Category ID if one exists on the Instance
-func getCallCategoryID(callMap map[string]interface{}, categoryGroup string) string {
+func getCallCategoryID(callMap map[string]interface{}, categoryGroup string) (string, string) {
 	categoryID := ""
+	categoryString := ""
 	categoryNameMapping := ""
+	categoryCode := ""
 	if categoryGroup == "Request" {
-		categoryNameMapping = fmt.Sprintf("%v", mapGenericConf.CoreFieldMapping["categoryId"])
+		categoryNameMapping = fmt.Sprintf("%v", mapGenericConf.CoreFieldMapping["h_category_id"])
+		categoryCode = getFieldValue(categoryNameMapping, callMap)
+		if swImportConf.CategoryMapping[categoryCode] != nil {
+			//Get Category Code from JSON mapping
+			if swImportConf.CategoryMapping[categoryCode] != nil {
+				categoryCode = fmt.Sprintf("%s", swImportConf.CategoryMapping[categoryCode])
+			} else {
+				//Mapping doesn't exist - replace hyphens from SW Profile code with colon, and try to use this
+				categoryCode = strings.Replace(categoryCode, ":", "-", -1)
+			}
+		}
+
 	} else {
 		categoryNameMapping = fmt.Sprintf("%v", mapGenericConf.AdditionalFieldMapping["h_closure_category_id"])
-	}
-	categoryCode := getFieldValue(categoryNameMapping, callMap)
-
-	if swImportConf.CategoryMapping[categoryCode] != nil {
-		//Get Category Code from JSON mapping
-		if swImportConf.CategoryMapping[categoryCode] != nil {
-			categoryCode = fmt.Sprintf("%s", swImportConf.CategoryMapping[categoryCode])
-		} else {
-			//Mapping doesn't exist - replace hyphens from SW Profile code with colon, and try to use this
-			categoryCode = strings.Replace(categoryCode, ":", "-", -1)
+		categoryCode = getFieldValue(categoryNameMapping, callMap)
+		if swImportConf.ResolutionCategoryMapping[categoryCode] != nil {
+			//Get Category Code from JSON mapping
+			if swImportConf.ResolutionCategoryMapping[categoryCode] != nil {
+				categoryCode = fmt.Sprintf("%s", swImportConf.ResolutionCategoryMapping[categoryCode])
+			} else {
+				//Mapping doesn't exist - replace hyphens from SW Profile code with colon, and try to use this
+				categoryCode = strings.Replace(categoryCode, ":", "-", -1)
+			}
 		}
+
 	}
 	if categoryCode != "" {
-		categoryID = getCategoryID(categoryCode, categoryGroup)
+		categoryID, categoryString = getCategoryID(categoryCode, categoryGroup)
 	}
-	return categoryID
+	return categoryID, categoryString
 }
 
 //getCategoryID takes a Category Code string and returns a correct Category ID if one exists in the cache or on the Instance
-func getCategoryID(categoryCode, categoryGroup string) string {
+func getCategoryID(categoryCode, categoryGroup string) (string, string) {
 	categoryID := ""
+	categoryString := ""
 	if categoryCode != "" {
-		categoryIsInCache, CategoryIDCache := recordInCache(categoryCode, categoryGroup+"Category")
+		categoryIsInCache, CategoryIDCache, CategoryNameCache := categoryInCache(categoryCode, categoryGroup+"Category")
 		//-- Check if we have cached the Category already
 		if categoryIsInCache {
 			categoryID = CategoryIDCache
+			categoryString = CategoryNameCache
 		} else {
-			categoryIsOnInstance, CategoryIDInstance := searchCategory(categoryCode, categoryGroup)
+			categoryIsOnInstance, CategoryIDInstance, CategoryStringInstance := searchCategory(categoryCode, categoryGroup)
 			//-- If Returned set output
 			if categoryIsOnInstance {
 				categoryID = CategoryIDInstance
+				categoryString = CategoryStringInstance
 			}
 		}
 	}
-	return categoryID
+	return categoryID, categoryString
 }
 
-//doesOwnerExist takes an Analyst ID string and returns a true if one exists in the cache or on the Instance
-func doesOwnerExist(analystID string) bool {
+//doesAnalystExist takes an Analyst ID string and returns a true if one exists in the cache or on the Instance
+func doesAnalystExist(analystID string) bool {
 	espXmlmc, err := NewEspXmlmcSession()
 	if err != nil {
 		return false
 	}
-	defer EspXmlmcSessiondDestroy(espXmlmc)
-
-	boolOwnerExists := false
+	boolAnalystExists := false
 	if analystID != "" {
-		analystIsInCache, _ := recordInCache(analystID, "Analyst")
+		analystIsInCache, strReturn := recordInCache(analystID, "Analyst")
 		//-- Check if we have cached the Analyst already
-		if analystIsInCache {
-			boolOwnerExists = true
+		if analystIsInCache && strReturn != "" {
+			boolAnalystExists = true
 		} else {
-			//-- ESP Query for site
-			espXmlmc.SetParam("application", appServiceManager)
-			espXmlmc.SetParam("entity", "Colleagues")
-			espXmlmc.SetParam("matchScope", "all")
-			espXmlmc.OpenElement("searchFilter")
-			espXmlmc.SetParam("h_user_id", analystID)
-			espXmlmc.CloseElement("searchFilter")
-			espXmlmc.SetParam("maxResults", "1")
+			//Get Analyst Info
+			espXmlmc.SetParam("userId", analystID)
 
-			XMLAnalystSearch, xmlmcErr := espXmlmc.Invoke("data", "entityBrowseRecords")
+			XMLAnalystSearch, xmlmcErr := espXmlmc.Invoke("admin", "userGetInfo")
 			if xmlmcErr != nil {
-				logger(4, "Unable to Search for Owner: "+fmt.Sprintf("%v", xmlmcErr), true)
-				log.Fatal(xmlmcErr)
+				logger(4, "Unable to Search for Request Owner ["+analystID+"]: "+fmt.Sprintf("%v", xmlmcErr), true)
 			}
-			var xmlRespon xmlmcAnalystListResponse
 
+			var xmlRespon xmlmcAnalystListResponse
 			err := xml.Unmarshal([]byte(XMLAnalystSearch), &xmlRespon)
 			if err != nil {
-				logger(4, "Unable to Search for Owner: "+fmt.Sprintf("%v", err), true)
+				logger(4, "Unable to Search for Request Owner ["+analystID+"]: "+fmt.Sprintf("%v", err), false)
 			} else {
 				if xmlRespon.MethodResult != "ok" {
-					logger(4, "Unable to Search for Owner: "+xmlRespon.State.ErrorRet, true)
+					//Analyst most likely does not exist
+					logger(4, "Unable to Search for Request Owner ["+analystID+"]: "+xmlRespon.State.ErrorRet, false)
 				} else {
 					//-- Check Response
-					if xmlRespon.Params.RowData.Row.AnalystName != "" {
-						boolOwnerExists = true
-						//-- Add Priority to Cache
+					if xmlRespon.AnalystFullName != "" {
+						boolAnalystExists = true
+						//-- Add Analyst to Cache
 						var newAnalystForCache analystListStruct
 						newAnalystForCache.AnalystID = analystID
-						newAnalystForCache.AnalystName = xmlRespon.Params.RowData.Row.AnalystName
-						name := []analystListStruct{newAnalystForCache}
-						analysts = append(analysts, name...)
+						newAnalystForCache.AnalystName = xmlRespon.AnalystFullName
+						analystNamedMap := []analystListStruct{newAnalystForCache}
+						mutexAnalysts.Lock()
+						analysts = append(analysts, analystNamedMap...)
+						mutexAnalysts.Unlock()
 					}
 				}
 			}
 		}
 	}
-	return boolOwnerExists
+	return boolAnalystExists
+}
+
+//doesCustomerExist takes a Customer ID string and returns a true if one exists in the cache or on the Instance
+func doesCustomerExist(customerID string) bool {
+	espXmlmc, err := NewEspXmlmcSession()
+	if err != nil {
+		return false
+	}
+	boolCustomerExists := false
+	if customerID != "" {
+		customerIsInCache, strReturn := recordInCache(customerID, "Customer")
+		//-- Check if we have cached the Analyst already
+		if customerIsInCache && strReturn != "" {
+			boolCustomerExists = true
+		} else {
+			//Get Analyst Info
+			espXmlmc.SetParam("customerId", customerID)
+			espXmlmc.SetParam("customerType", swImportConf.CustomerType)
+			XMLCustomerSearch, xmlmcErr := espXmlmc.Invoke("apps/"+appServiceManager, "shrGetCustomerDetails")
+			if xmlmcErr != nil {
+				logger(4, "Unable to Search for Customer ["+customerID+"]: "+fmt.Sprintf("%v", xmlmcErr), true)
+			}
+
+			var xmlRespon xmlmcCustomerListResponse
+			err := xml.Unmarshal([]byte(XMLCustomerSearch), &xmlRespon)
+			if err != nil {
+				logger(4, "Unable to Search for Customer ["+customerID+"]: "+fmt.Sprintf("%v", err), false)
+			} else {
+				if xmlRespon.MethodResult != "ok" {
+					//Customer most likely does not exist
+					logger(4, "Unable to Search for Customer ["+customerID+"]: "+xmlRespon.State.ErrorRet, false)
+				} else {
+					//-- Check Response
+					if xmlRespon.CustomerFirstName != "" {
+						boolCustomerExists = true
+						//-- Add Customer to Cache
+						var newCustomerForCache customerListStruct
+						newCustomerForCache.CustomerID = customerID
+						newCustomerForCache.CustomerName = xmlRespon.CustomerFirstName + " " + xmlRespon.CustomerLastName
+						customerNamedMap := []customerListStruct{newCustomerForCache}
+						mutexCustomers.Lock()
+						customers = append(customers, customerNamedMap...)
+						mutexCustomers.Unlock()
+					}
+				}
+			}
+		}
+	}
+	return boolCustomerExists
 }
 
 // recordInCache -- Function to check if passed-thorugh record name has been cached
@@ -1820,63 +1927,99 @@ func recordInCache(recordName, recordType string) (bool, string) {
 	strReturn := ""
 	switch recordType {
 	case "Service":
-		//-- Check if record in Priority Cache
+		//-- Check if record in Service Cache
+		mutexServices.Lock()
 		for _, service := range services {
 			if service.ServiceName == recordName {
 				boolReturn = true
 				strReturn = strconv.Itoa(service.ServiceID)
 			}
 		}
+		mutexServices.Unlock()
 	case "Priority":
 		//-- Check if record in Priority Cache
+		mutexPriorities.Lock()
 		for _, priority := range priorities {
 			if priority.PriorityName == recordName {
 				boolReturn = true
 				strReturn = strconv.Itoa(priority.PriorityID)
 			}
 		}
+		mutexPriorities.Unlock()
 	case "Site":
 		//-- Check if record in Site Cache
+		mutexSites.Lock()
 		for _, site := range sites {
 			if site.SiteName == recordName {
 				boolReturn = true
 				strReturn = strconv.Itoa(site.SiteID)
 			}
 		}
+		mutexSites.Unlock()
 	case "Team":
 		//-- Check if record in Team Cache
+		mutexTeams.Lock()
 		for _, team := range teams {
 			if team.TeamName == recordName {
 				boolReturn = true
 				strReturn = team.TeamID
 			}
 		}
+		mutexTeams.Unlock()
 	case "Analyst":
 		//-- Check if record in Analyst Cache
+		mutexAnalysts.Lock()
 		for _, analyst := range analysts {
 			if analyst.AnalystID == recordName {
 				boolReturn = true
-				strReturn = analyst.AnalystID
+				strReturn = analyst.AnalystName
 			}
 		}
+		mutexAnalysts.Unlock()
+	case "Customer":
+		//-- Check if record in Customer Cache
+		mutexCustomers.Lock()
+		for _, customer := range customers {
+			if customer.CustomerID == recordName {
+				boolReturn = true
+				strReturn = customer.CustomerName
+			}
+		}
+		mutexCustomers.Unlock()
+	}
+	return boolReturn, strReturn
+}
+
+// categoryInCache -- Function to check if passed-thorugh category been cached
+// if so, pass back the Category ID and Full Name
+func categoryInCache(recordName, recordType string) (bool, string, string) {
+	boolReturn := false
+	idReturn := ""
+	strReturn := ""
+	switch recordType {
 	case "RequestCategory":
 		//-- Check if record in Category Cache
+		mutexCategories.Lock()
 		for _, category := range categories {
 			if category.CategoryCode == recordName {
 				boolReturn = true
 				strReturn = category.CategoryID
 			}
 		}
+		mutexCategories.Unlock()
 	case "ClosureCategory":
 		//-- Check if record in Category Cache
+		mutexCloseCategories.Lock()
 		for _, category := range closeCategories {
 			if category.CategoryCode == recordName {
 				boolReturn = true
-				strReturn = category.CategoryID
+				idReturn = category.CategoryID
+				strReturn = category.CategoryName
 			}
 		}
+		mutexCloseCategories.Unlock()
 	}
-	return boolReturn, strReturn
+	return boolReturn, idReturn, strReturn
 }
 
 // seachSite -- Function to check if passed-through  site  name is on the instance
@@ -1885,7 +2028,6 @@ func searchSite(siteName string) (bool, int) {
 	if err != nil {
 		return false, 0
 	}
-	defer EspXmlmcSessiondDestroy(espXmlmc)
 
 	boolReturn := false
 	intReturn := 0
@@ -1912,16 +2054,18 @@ func searchSite(siteName string) (bool, int) {
 			logger(4, "Unable to Search for Site: "+xmlRespon.State.ErrorRet, false)
 		} else {
 			//-- Check Response
-			if xmlRespon.Params.RowData.Row.SiteName != "" {
-				if strings.ToLower(xmlRespon.Params.RowData.Row.SiteName) == strings.ToLower(siteName) {
-					intReturn = xmlRespon.Params.RowData.Row.SiteID
+			if xmlRespon.SiteName != "" {
+				if strings.ToLower(xmlRespon.SiteName) == strings.ToLower(siteName) {
+					intReturn = xmlRespon.SiteID
 					boolReturn = true
 					//-- Add Site to Cache
 					var newSiteForCache siteListStruct
 					newSiteForCache.SiteID = intReturn
 					newSiteForCache.SiteName = siteName
-					name := []siteListStruct{newSiteForCache}
-					sites = append(sites, name...)
+					siteNamedMap := []siteListStruct{newSiteForCache}
+					mutexSites.Lock()
+					sites = append(sites, siteNamedMap...)
+					mutexSites.Unlock()
 				}
 			}
 		}
@@ -1938,7 +2082,7 @@ func searchPriority(priorityName string) (bool, int) {
 	if err != nil {
 		return false, 0
 	}
-	defer EspXmlmcSessiondDestroy(espXmlmc)
+
 	espXmlmc.SetParam("application", appServiceManager)
 	espXmlmc.SetParam("entity", "Priority")
 	espXmlmc.SetParam("matchScope", "all")
@@ -1962,16 +2106,18 @@ func searchPriority(priorityName string) (bool, int) {
 			logger(4, "Unable to Search for Priority: "+xmlRespon.State.ErrorRet, false)
 		} else {
 			//-- Check Response
-			if xmlRespon.Params.RowData.Row.PriorityName != "" {
-				if strings.ToLower(xmlRespon.Params.RowData.Row.PriorityName) == strings.ToLower(priorityName) {
-					intReturn = xmlRespon.Params.RowData.Row.PriorityID
+			if xmlRespon.PriorityName != "" {
+				if strings.ToLower(xmlRespon.PriorityName) == strings.ToLower(priorityName) {
+					intReturn = xmlRespon.PriorityID
 					boolReturn = true
 					//-- Add Priority to Cache
 					var newPriorityForCache priorityListStruct
 					newPriorityForCache.PriorityID = intReturn
 					newPriorityForCache.PriorityName = priorityName
-					name := []priorityListStruct{newPriorityForCache}
-					priorities = append(priorities, name...)
+					priorityNamedMap := []priorityListStruct{newPriorityForCache}
+					mutexPriorities.Lock()
+					priorities = append(priorities, priorityNamedMap...)
+					mutexPriorities.Unlock()
 				}
 			}
 		}
@@ -1987,7 +2133,7 @@ func searchService(serviceName string) (bool, int) {
 	if err != nil {
 		return false, 0
 	}
-	defer EspXmlmcSessiondDestroy(espXmlmc)
+
 	//-- ESP Query for service
 	espXmlmc.SetParam("application", appServiceManager)
 	espXmlmc.SetParam("entity", "Services")
@@ -2012,24 +2158,32 @@ func searchService(serviceName string) (bool, int) {
 			logger(4, "Unable to Search for Service: "+xmlRespon.State.ErrorRet, false)
 		} else {
 			//-- Check Response
-			if xmlRespon.Params.RowData.Row.ServiceName != "" {
-				if strings.ToLower(xmlRespon.Params.RowData.Row.ServiceName) == strings.ToLower(serviceName) {
-					intReturn = xmlRespon.Params.RowData.Row.ServiceID
+			if xmlRespon.ServiceName != "" {
+				if strings.ToLower(xmlRespon.ServiceName) == strings.ToLower(serviceName) {
+					intReturn = xmlRespon.ServiceID
 					boolReturn = true
 					//-- Add Service to Cache
 					var newServiceForCache serviceListStruct
 					newServiceForCache.ServiceID = intReturn
 					newServiceForCache.ServiceName = serviceName
-					name := []serviceListStruct{newServiceForCache}
-					services = append(services, name...)
+					newServiceForCache.ServiceBPMIncident = xmlRespon.BPMIncident
+					newServiceForCache.ServiceBPMService = xmlRespon.BPMService
+					newServiceForCache.ServiceBPMChange = xmlRespon.BPMChange
+					newServiceForCache.ServiceBPMProblem = xmlRespon.BPMProblem
+					newServiceForCache.ServiceBPMKnownError = xmlRespon.BPMKnownError
+					serviceNamedMap := []serviceListStruct{newServiceForCache}
+					mutexServices.Lock()
+					services = append(services, serviceNamedMap...)
+					mutexServices.Unlock()
 				}
 			}
 		}
 	}
+	//Return Service ID once cached - we can now use this in the calling function to get all details from cache
 	return boolReturn, intReturn
 }
 
-// seachTeam -- Function to check if passed-through support team name is on the instance
+// searchTeam -- Function to check if passed-through support team name is on the instance
 func searchTeam(teamName string) (bool, string) {
 	boolReturn := false
 	strReturn := ""
@@ -2038,10 +2192,7 @@ func searchTeam(teamName string) (bool, string) {
 	if err != nil {
 		return false, "Unable to create connection"
 	}
-	defer EspXmlmcSessiondDestroy(espXmlmc)
-	espXmlmc.SetParam("userId", swImportConf.HBConf.UserName)
-	espXmlmc.SetParam("password", base64.StdEncoding.EncodeToString([]byte(swImportConf.HBConf.Password)))
-	espXmlmc.Invoke("session", "userLogon")
+
 	espXmlmc.SetParam("entity", "Groups")
 	espXmlmc.SetParam("matchScope", "all")
 	espXmlmc.OpenElement("searchFilter")
@@ -2064,16 +2215,18 @@ func searchTeam(teamName string) (bool, string) {
 			logger(4, "Unable to Search for Team: "+xmlRespon.State.ErrorRet, true)
 		} else {
 			//-- Check Response
-			if xmlRespon.Params.RowData.Row.TeamName != "" {
-				if strings.ToLower(xmlRespon.Params.RowData.Row.TeamName) == strings.ToLower(teamName) {
-					strReturn = xmlRespon.Params.RowData.Row.TeamID
+			if xmlRespon.TeamName != "" {
+				if strings.ToLower(xmlRespon.TeamName) == strings.ToLower(teamName) {
+					strReturn = xmlRespon.TeamID
 					boolReturn = true
 					//-- Add Team to Cache
 					var newTeamForCache teamListStruct
 					newTeamForCache.TeamID = strReturn
 					newTeamForCache.TeamName = teamName
-					name := []teamListStruct{newTeamForCache}
-					teams = append(teams, name...)
+					teamNamedMap := []teamListStruct{newTeamForCache}
+					mutexTeams.Lock()
+					teams = append(teams, teamNamedMap...)
+					mutexTeams.Unlock()
 				}
 			}
 		}
@@ -2082,13 +2235,14 @@ func searchTeam(teamName string) (bool, string) {
 }
 
 // seachCategory -- Function to check if passed-through support category name is on the instance
-func searchCategory(categoryCode, categoryGroup string) (bool, string) {
+func searchCategory(categoryCode, categoryGroup string) (bool, string, string) {
 	espXmlmc, err := NewEspXmlmcSession()
 	if err != nil {
-		return false, "Unable to create connection"
+		return false, "Unable to create connection", ""
 	}
-	defer EspXmlmcSessiondDestroy(espXmlmc)
+
 	boolReturn := false
+	idReturn := ""
 	strReturn := ""
 	//-- ESP Query for category
 	espXmlmc.SetParam("codeGroup", categoryGroup)
@@ -2109,24 +2263,30 @@ func searchCategory(categoryCode, categoryGroup string) (bool, string) {
 			logger(4, "Unable to Search for "+categoryGroup+" Category: "+xmlRespon.State.ErrorRet, false)
 		} else {
 			//-- Check Response
-			if xmlRespon.Params.CategoryName != "" {
-				strReturn = xmlRespon.Params.CategoryID
+			if xmlRespon.CategoryName != "" {
+				strReturn = xmlRespon.CategoryName
+				idReturn = xmlRespon.CategoryID
 				boolReturn = true
 				//-- Add Category to Cache
 				var newCategoryForCache categoryListStruct
-				newCategoryForCache.CategoryID = strReturn
+				newCategoryForCache.CategoryID = idReturn
 				newCategoryForCache.CategoryCode = categoryCode
-				name := []categoryListStruct{newCategoryForCache}
+				newCategoryForCache.CategoryName = strReturn
+				categoryNamedMap := []categoryListStruct{newCategoryForCache}
 				switch categoryGroup {
 				case "Request":
-					categories = append(categories, name...)
+					mutexCategories.Lock()
+					categories = append(categories, categoryNamedMap...)
+					mutexCategories.Unlock()
 				case "Closure":
-					closeCategories = append(closeCategories, name...)
+					mutexCloseCategories.Lock()
+					closeCategories = append(closeCategories, categoryNamedMap...)
+					mutexCloseCategories.Unlock()
 				}
 			}
 		}
 	}
-	return boolReturn, strReturn
+	return boolReturn, idReturn, strReturn
 }
 
 //padCalLRef -- Function to pad Call Reference to specified digits, adding an optional prefix
@@ -2289,12 +2449,12 @@ func logger(t int, s string, outputtoCLI bool) {
 
 	//-- Open Log File
 	f, err := os.OpenFile(logFileName, os.O_APPEND|os.O_CREATE|os.O_RDWR, 0777)
+	// don't forget to close it
+	defer f.Close()
 	if err != nil {
 		color.Red("Error Creating Log File %q: %s \n", logFileName, err)
 		os.Exit(100)
 	}
-	// don't forget to close it
-	defer f.Close()
 	// assign it to the standard logger
 	log.SetOutput(f)
 	var errorLogPrefix string
@@ -2337,9 +2497,9 @@ func logger(t int, s string, outputtoCLI bool) {
 	}
 
 	if outputtoCLI {
-
 		fmt.Printf("%v \n", errorLogPrefix+s)
 	}
+
 	log.Println(errorLogPrefix + s)
 }
 
@@ -2393,19 +2553,10 @@ func epochToDateTime(epochDateString string) string {
 	return dateTime
 }
 
-//NewEspXmlmcSession - starts a new XMLMC session off
+//NewEspXmlmcSession - New Xmlmc Session variable (Cloned Session)
 func NewEspXmlmcSession() (*apiLib.XmlmcInstStruct, error) {
+	time.Sleep(150 * time.Millisecond)
 	espXmlmcLocal := apiLib.NewXmlmcInstance(swImportConf.HBConf.URL)
-	espXmlmcLocal.SetParam("userId", swImportConf.HBConf.UserName)
-	espXmlmcLocal.SetParam("password", base64.StdEncoding.EncodeToString([]byte(swImportConf.HBConf.Password)))
-	_, returncode := espXmlmcLocal.Invoke("session", "userLogon")
-
-	return espXmlmcLocal, returncode
-}
-
-//EspXmlmcSessiondDestroy - Ends a given XMLMC session
-func EspXmlmcSessiondDestroy(XMLMCSession *apiLib.XmlmcInstStruct) {
-
-	XMLMCSession.Invoke("session", "userLogoff")
-
+	espXmlmcLocal.SetSessionID(espXmlmc.GetSessionID())
+	return espXmlmcLocal, nil
 }
