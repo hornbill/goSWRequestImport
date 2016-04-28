@@ -1,3 +1,9 @@
+## 1.2.1 (April 28th, 2016)
+
+Features:
+
+- Takes request prefix from Application Settings rather than import tool
+
 ## 1.2.0 (April 27th, 2016)
 
 Features:

@@ -26,7 +26,7 @@ import (
 )
 
 const (
-	version           = "1.2.0"
+	version           = "1.2.1"
 	appServiceManager = "com.hornbill.servicemanager"
 	//Disk Space Declarations
 	sizeKB            float64 = 1 << (10 * 1)
@@ -83,6 +83,7 @@ var (
 	wgRequest            sync.WaitGroup
 	wgAssoc              sync.WaitGroup
 	wgFile               sync.WaitGroup
+	reqPrefix            string
 )
 
 // ----- Structures -----
@@ -160,6 +161,13 @@ type stateStruct struct {
 }
 
 //----- Data Structs -----
+
+type xmlmcSysSettingResponse struct {
+	MethodResult string      `xml:"status,attr"`
+	State        stateStruct `xml:"state"`
+	Setting      string         `xml:"params>option>value"`
+}
+
 //----- Request Logged Structs
 type xmlmcRequestResponseStruct struct {
 	MethodResult string      `xml:"status,attr"`
@@ -413,26 +421,31 @@ func main() {
 	//Process Incidents
 	mapGenericConf = swImportConf.ConfIncident
 	if mapGenericConf.Import == true {
+		reqPrefix = getRequestPrefix("IN")
 		processCallData()
 	}
 	//Process Service Requests
 	mapGenericConf = swImportConf.ConfServiceRequest
 	if mapGenericConf.Import == true {
+		reqPrefix = getRequestPrefix("SR")
 		processCallData()
 	}
 	//Process Change Requests
 	mapGenericConf = swImportConf.ConfChangeRequest
 	if mapGenericConf.Import == true {
+		reqPrefix = getRequestPrefix("CH")
 		processCallData()
 	}
 	//Process Problems
 	mapGenericConf = swImportConf.ConfProblem
 	if mapGenericConf.Import == true {
+		reqPrefix = getRequestPrefix("PM")
 		processCallData()
 	}
 	//Process Known Errors
 	mapGenericConf = swImportConf.ConfKnownError
 	if mapGenericConf.Import == true {
+		reqPrefix = getRequestPrefix("KE")
 		processCallData()
 	}
 
@@ -450,6 +463,47 @@ func main() {
 	endTime = time.Now().Sub(startTime)
 	logger(1, "Time Taken: "+fmt.Sprintf("%v", endTime), true)
 	logger(1, "---- Supportworks Call Import Complete ---- ", true)
+}
+
+//getRequestPrefix - gets and returns current maxResultsAllowed sys setting value
+func getRequestPrefix(callclass string) string {
+	espXmlmc, sessErr := NewEspXmlmcSession()
+	if sessErr != nil {
+		logger(4, "Unable to attach to XMLMC session to get Request Prefix. Using default ["+callclass+"].", false)
+		return callclass
+	}
+	strSetting := ""
+	switch callclass {
+	case "IN":
+		strSetting = "guest.app.requests.types.IN"
+	case "SR":
+		strSetting = "guest.app.requests.types.SR"
+	case "CH":
+		strSetting = "app.requests.types.CH"
+	case "PM":
+		strSetting = "app.requests.types.PM"
+	case "KE":
+		strSetting = "app.requests.types.KE"
+	}
+
+	espXmlmc.SetParam("appName", appServiceManager)
+	espXmlmc.SetParam("filter", strSetting)
+	response, err := espXmlmc.Invoke("admin", "appOptionGet")
+	if err != nil {
+		logger(4, "Could not retrieve System Setting for Request Prefix. Using default ["+callclass+"].", false)
+		return callclass
+	}
+	var xmlRespon xmlmcSysSettingResponse
+	err = xml.Unmarshal([]byte(response), &xmlRespon)
+	if err != nil {
+		logger(4, "Could not retrieve System Setting for Request Prefix. Using default ["+callclass+"].", false)
+		return callclass
+	}
+	if xmlRespon.MethodResult != "ok" {
+		logger(4, "Could not retrieve System Setting for Request Prefix: "+xmlRespon.MethodResult, false)
+		return callclass
+	}
+	return xmlRespon.Setting
 }
 
 func processFileAttachments() {
@@ -1260,6 +1314,8 @@ func logNewCall(callClass string, callMap map[string]interface{}, swCallID strin
 
 		//Everything Else
 		if boolAutoProcess &&
+			strAttribute != "h_requesttype" &&
+			strAttribute != "h_request_prefix" &&
 			strAttribute != "h_category" &&
 			strAttribute != "h_closure_category" &&
 			strAttribute != "h_fk_servicename" &&
@@ -1276,24 +1332,9 @@ func logNewCall(callClass string, callMap map[string]interface{}, swCallID strin
 
 	}
 
-	//Add call class
+	//Add request class & prefix
 	espXmlmc.SetParam("h_requesttype", callClass)
-
-	//Using call class, add Call Prefix
-	strCallPrefix := ""
-	switch callClass {
-	case "Incident":
-		strCallPrefix = "IN"
-	case "Service Request":
-		strCallPrefix = "SR"
-	case "Change Request":
-		strCallPrefix = "CR"
-	case "Problem":
-		strCallPrefix = "PM"
-	case "Known Error":
-		strCallPrefix = "KE"
-	}
-	espXmlmc.SetParam("h_request_prefix", strCallPrefix)
+	espXmlmc.SetParam("h_request_prefix", reqPrefix)
 
 	espXmlmc.CloseElement("record")
 	espXmlmc.CloseElement("primaryEntityData")
