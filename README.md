@@ -505,6 +505,7 @@ Contains request-class specific configuration. This section should be repeated f
 * - Any Other Value is treated literally as written example:
 * -- "h_summary":"[itsm_title]", - the value of itsm_title is taken from the SQL output and populated within this field
 * -- "h_description":"Supportworks Incident Reference: [oldCallRef]\n\n[updatetxt]", - the request description would be populated with "Supportworks Incident Reference: ", followed by the Supportworks call reference, 2 new lines then the call description text from the Supportworks call.
+* - Any Hornbill Date Field being populated should have an EPOCH value passed to it. This includes h_datelogged, h_dateresolved and h_dateclosed.
 * Core Fields that can resolve associated record from passed-through value:   
 * -- "h_site_id":"[site]", - When a string is passed to the site field, the script attempts to resolve the given site name against the Site entity, and populates the request with the correct site information. If the site cannot be resolved, the site details are not populated for the request being imported.
 * -- "h_fk_user_id":"[cust_id]", - As site, above, but resolves the original request customer against the users or contacts within Hornbill.
