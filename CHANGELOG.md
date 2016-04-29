@@ -1,3 +1,15 @@
+## 1.2.2 (April 29th, 2016)
+
+Features:
+
+- Allow the back-dating of imported requests,to the date/time the original Supportworks request was logged
+- Allow the import of Resolved Date & Closed Date to match those of the original Supportworks request
+- New requests logged from requests that are On Hold in Supportworks are now placed On Hold in Service Manager, to the original requests date & time
+
+Defect Fixes:
+
+- Fixed issue when importing historical diary entries that have a Time Spent value of NULL
+
 ## 1.2.1 (April 28th, 2016)
 
 Features:

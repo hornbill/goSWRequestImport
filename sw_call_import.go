@@ -26,7 +26,7 @@ import (
 )
 
 const (
-	version           = "1.2.1"
+	version           = "1.2.2"
 	appServiceManager = "com.hornbill.servicemanager"
 	//Disk Space Declarations
 	sizeKB            float64 = 1 << (10 * 1)
@@ -343,8 +343,8 @@ func main() {
 	arrSWStatus["1"] = "status.open"
 	arrSWStatus["2"] = "status.open"
 	arrSWStatus["3"] = "status.open"
-	arrSWStatus["4"] = "status.open"
-	arrSWStatus["5"] = "status.offHold"
+	arrSWStatus["4"] = "status.onHold"
+	arrSWStatus["5"] = "status.open"
 	arrSWStatus["6"] = "status.resolved"
 	arrSWStatus["8"] = "status.new"
 	arrSWStatus["9"] = "status.open"
@@ -1168,6 +1168,9 @@ func logNewCall(callClass string, callMap map[string]interface{}, swCallID strin
 	strAttribute := ""
 	strMapping := ""
 	strServiceBPM := ""
+	boolUpdateLogDate := false
+	strLoggedDate := ""
+	strClosedDate := ""
 	//Loop through core fields from config, add to XMLMC Params
 	for k, v := range mapGenericConf.CoreFieldMapping {
 		boolAutoProcess := true
@@ -1312,6 +1315,39 @@ func logNewCall(callClass string, callMap map[string]interface{}, swCallID strin
 			boolAutoProcess = false
 		}
 
+		// Resolved Date/Time
+		if strAttribute == "h_dateresolved" && strMapping != ""  && (strStatus == "status.resolved" || strStatus == "status.closed") {
+			resolvedEPOCH := getFieldValue(strMapping, callMap)
+			if resolvedEPOCH != "" && resolvedEPOCH != "0" {
+				strResolvedDate := epochToDateTime(resolvedEPOCH)
+				if strResolvedDate != "" {
+					espXmlmc.SetParam(strAttribute, strResolvedDate)
+				}
+			}
+		}
+
+		// Closed Date/Time
+		if strAttribute == "h_dateclosed" && strMapping != "" && (strStatus == "status.resolved" || strStatus == "status.closed") {
+			closedEPOCH := getFieldValue(strMapping, callMap)
+			if closedEPOCH != "" && closedEPOCH != "0" {
+				strClosedDate = epochToDateTime(closedEPOCH)
+				if strClosedDate != "" {
+					espXmlmc.SetParam(strAttribute, strClosedDate)
+				}
+			}
+		}
+
+		// Log Date/Time - setup ready to be processed after call logged
+		if strAttribute == "h_datelogged" && strMapping != "" {
+			loggedEPOCH := getFieldValue(strMapping, callMap)
+			if loggedEPOCH != "" && loggedEPOCH != "0" {
+				strLoggedDate = epochToDateTime(loggedEPOCH)
+				if strLoggedDate != "" {
+					boolUpdateLogDate = true
+				}
+			}
+		}
+
 		//Everything Else
 		if boolAutoProcess &&
 			strAttribute != "h_requesttype" &&
@@ -1323,7 +1359,10 @@ func logNewCall(callClass string, callMap map[string]interface{}, swCallID strin
 			strAttribute != "h_site" &&
 			strAttribute != "h_fk_priorityname" &&
 			strAttribute != "h_ownername" &&
-			strAttribute != "h_fk_user_name" {
+			strAttribute != "h_fk_user_name" &&
+			strAttribute != "h_datelogged" &&
+			strAttribute != "h_dateresolved" &&
+			strAttribute != "h_dateclosed" {
 
 			if strMapping != "" && getFieldValue(strMapping, callMap) != "" {
 				espXmlmc.SetParam(strAttribute, getFieldValue(strMapping, callMap))
@@ -1391,6 +1430,32 @@ func logNewCall(callClass string, callMap map[string]interface{}, swCallID strin
 			counters.created++
 			counters.Unlock()
 			boolCallLoggedOK = true
+
+			//Now update Logdate
+			if boolUpdateLogDate {
+				espXmlmc.SetParam("application", appServiceManager)
+				espXmlmc.SetParam("entity", "Requests")
+				espXmlmc.OpenElement("primaryEntityData")
+				espXmlmc.OpenElement("record")
+				espXmlmc.SetParam("h_pk_reference", strNewCallRef)
+				espXmlmc.SetParam("h_datelogged", strLoggedDate)
+				espXmlmc.CloseElement("record")
+				espXmlmc.CloseElement("primaryEntityData")
+				XMLBPM, xmlmcErr := espXmlmc.Invoke("data", "entityUpdateRecord")
+				if xmlmcErr != nil {
+					log.Fatal(xmlmcErr)
+				}
+				var xmlRespon xmlmcResponse
+
+				errLogDate := xml.Unmarshal([]byte(XMLBPM), &xmlRespon)
+				if errLogDate != nil {
+					logger(4, "Unable to update Log Date of request ["+strNewCallRef+"] : "+fmt.Sprintf("%v", errLogDate), false)
+				}
+				if xmlRespon.MethodResult != "ok" {
+					logger(4, "Unable to update Log Date of request ["+strNewCallRef+"] : "+xmlRespon.State.ErrorRet, false)
+				}
+			}
+
 			//Now do BPM Processing
 			if strStatus != "status.resolved" &&
 				strStatus != "status.closed" &&
@@ -1444,6 +1509,28 @@ func logNewCall(callClass string, callMap map[string]interface{}, swCallID strin
 							logger(4, "Unable to associate BPM to Request: "+xmlRespon.State.ErrorRet, false)
 						}
 					}
+				}
+			}
+
+			// Now handle calls in an On Hold status
+			if strStatus == "status.onHold" {
+				espXmlmc.SetParam("requestId", strNewCallRef)
+				if strClosedDate != "" {
+					espXmlmc.SetParam("onHoldUntil", strClosedDate)
+				}
+				espXmlmc.SetParam("strReason", "Request imported from Supportworks in an On Hold status. See Historical Request Updates for further information.")
+				XMLBPM, xmlmcErr := espXmlmc.Invoke("apps/"+appServiceManager+"/Requests", "holdRequest")
+				if xmlmcErr != nil {
+					log.Fatal(xmlmcErr)
+				}
+				var xmlRespon xmlmcResponse
+
+				errLogDate := xml.Unmarshal([]byte(XMLBPM), &xmlRespon)
+				if errLogDate != nil {
+					logger(4, "Unable to place request on hold ["+strNewCallRef+"] : "+fmt.Sprintf("%v", errLogDate), false)
+				}
+				if xmlRespon.MethodResult != "ok" {
+					logger(4, "Unable to place request on hold ["+strNewCallRef+"] : "+xmlRespon.State.ErrorRet, false)
 				}
 			}
 		}
@@ -1509,24 +1596,28 @@ func applyHistoricalUpdates(newCallRef, swCallRef string) bool {
 			logger(4, "Unable to retrieve data from SQL query: "+fmt.Sprintf("%v", err), false)
 		} else {
 			//Update Time - EPOCH to Date/Time Conversion
-			diaryTimex := ""
-			if updateTime, ok := diaryEntry["updatetimex"].(int64); ok {
-				diaryTimex = strconv.FormatInt(updateTime, 10)
-			} else {
-				diaryTimex = fmt.Sprintf("%+s", diaryEntry["updatetimex"])
+			diaryTime := ""
+			if diaryEntry["updatetimex"] != nil {
+				diaryTimex := ""
+				if updateTime, ok := diaryEntry["updatetimex"].(int64); ok {
+					diaryTimex = strconv.FormatInt(updateTime, 10)
+					} else {
+						diaryTimex = fmt.Sprintf("%+s", diaryEntry["updatetimex"])
+					}
+					diaryTime = epochToDateTime(diaryTimex)
 			}
-
-			diaryTime := epochToDateTime(diaryTimex)
 
 			//Check for source/code/text having nil value
 			diarySource := ""
 			if diaryEntry["udsource"] != nil {
 				diarySource = fmt.Sprintf("%+s", diaryEntry["udsource"])
 			}
+
 			diaryCode := ""
 			if diaryEntry["udcode"] != nil {
 				diaryCode = fmt.Sprintf("%+s", diaryEntry["udcode"])
 			}
+
 			diaryText := ""
 			if diaryEntry["updatetxt"] != nil {
 				diaryText = fmt.Sprintf("%+s", diaryEntry["updatetxt"])
@@ -1534,24 +1625,30 @@ func applyHistoricalUpdates(newCallRef, swCallRef string) bool {
 			}
 
 			diaryIndex := ""
-			if updateIndex, ok := diaryEntry["udindex"].(int64); ok {
-				diaryIndex = strconv.FormatInt(updateIndex, 10)
-			} else {
-				diaryIndex = fmt.Sprintf("%+s", diaryEntry["udindex"])
+			if diaryEntry["udindex"] != nil {
+				if updateIndex, ok := diaryEntry["udindex"].(int64); ok {
+					diaryIndex = strconv.FormatInt(updateIndex, 10)
+					} else {
+						diaryIndex = fmt.Sprintf("%+s", diaryEntry["udindex"])
+					}
 			}
 
 			diaryTimeSpent := ""
-			if updateSpent, ok := diaryEntry["timespent"].(int64); ok {
-				diaryTimeSpent = strconv.FormatInt(updateSpent, 10)
-			} else {
-				diaryTimeSpent = fmt.Sprintf("%+s", diaryEntry["timespent"])
+			if diaryEntry["timespent"] != nil {
+				if updateSpent, ok := diaryEntry["timespent"].(int64); ok {
+					diaryTimeSpent = strconv.FormatInt(updateSpent, 10)
+					} else {
+						diaryTimeSpent = fmt.Sprintf("%+s", diaryEntry["timespent"])
+					}
 			}
 
 			diaryType := ""
-			if updateType, ok := diaryEntry["udtype"].(int64); ok {
-				diaryType = strconv.FormatInt(updateType, 10)
-			} else {
-				diaryType = fmt.Sprintf("%+s", diaryEntry["udtype"])
+			if diaryEntry["udtype"] != nil {
+				if updateType, ok := diaryEntry["udtype"].(int64); ok {
+					diaryType = strconv.FormatInt(updateType, 10)
+					} else {
+						diaryType = fmt.Sprintf("%+s", diaryEntry["udtype"])
+					}
 			}
 
 			espXmlmc.SetParam("application", appServiceManager)
