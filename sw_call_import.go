@@ -26,7 +26,7 @@ import (
 )
 
 const (
-	version           = "1.2.2"
+	version           = "1.2.3"
 	appServiceManager = "com.hornbill.servicemanager"
 	//Disk Space Declarations
 	sizeKB            float64 = 1 << (10 * 1)
@@ -1214,12 +1214,13 @@ func logNewCall(callClass string, callMap map[string]interface{}, swCallID strin
 		//Priority ID & Name
 		//-- Get Priority ID
 		if strAttribute == "h_fk_priorityid" {
-			strPriorityID, strPriorityName := getCallPriorityID(callMap)
-			if strPriorityID == "" && mapGenericConf.DefaultPriority != "" {
+			strPriorityID := getFieldValue(strMapping, callMap)
+			strPriorityMapped, strPriorityName := getCallPriorityID(strPriorityID)
+			if strPriorityMapped == "" && mapGenericConf.DefaultPriority != "" {
 				strPriorityID = getPriorityID(mapGenericConf.DefaultPriority)
 				strPriorityName = mapGenericConf.DefaultPriority
 			}
-			espXmlmc.SetParam(strAttribute, strPriorityID)
+			espXmlmc.SetParam(strAttribute, strPriorityMapped)
 			espXmlmc.SetParam("h_fk_priorityname", strPriorityName)
 			boolAutoProcess = false
 		}
@@ -1230,7 +1231,7 @@ func logNewCall(callClass string, callMap map[string]interface{}, swCallID strin
 			strCategoryID, strCategoryName := getCallCategoryID(callMap, "Request")
 			if strCategoryID != "" && strCategoryName != "" {
 				espXmlmc.SetParam(strAttribute, strCategoryID)
-				espXmlmc.SetParam("h_category", strCategoryID)
+				espXmlmc.SetParam("h_category", strCategoryName)
 			}
 			boolAutoProcess = false
 		}
@@ -1248,7 +1249,8 @@ func logNewCall(callClass string, callMap map[string]interface{}, swCallID strin
 		// Service ID & Name, & BPM Workflow
 		if strAttribute == "h_fk_serviceid" {
 			//-- Get Service ID
-			strServiceID := getCallServiceID(callMap)
+			swServiceID := getFieldValue(strMapping, callMap)
+			strServiceID := getCallServiceID(swServiceID)
 			if strServiceID == "" && mapGenericConf.DefaultService != "" {
 				strServiceID = getServiceID(mapGenericConf.DefaultService)
 			}
@@ -1292,7 +1294,8 @@ func logNewCall(callClass string, callMap map[string]interface{}, swCallID strin
 		// Team ID and Name
 		if strAttribute == "h_fk_team_id" {
 			//-- Get Team ID
-			strTeamID, strTeamName := getCallTeamID(callMap)
+			swTeamID := getFieldValue(strMapping, callMap)
+			strTeamID, strTeamName := getCallTeamID(swTeamID)
 			if strTeamID == "" && mapGenericConf.DefaultTeam != "" {
 				strTeamName = mapGenericConf.DefaultTeam
 				strTeamID = getTeamID(strTeamName)
@@ -1327,11 +1330,11 @@ func logNewCall(callClass string, callMap map[string]interface{}, swCallID strin
 		}
 
 		// Closed Date/Time
-		if strAttribute == "h_dateclosed" && strMapping != "" && (strStatus == "status.resolved" || strStatus == "status.closed") {
+		if strAttribute == "h_dateclosed" && strMapping != "" && (strStatus == "status.resolved" || strStatus == "status.closed" || strStatus == "status.onHold") {
 			closedEPOCH := getFieldValue(strMapping, callMap)
 			if closedEPOCH != "" && closedEPOCH != "0" {
 				strClosedDate = epochToDateTime(closedEPOCH)
-				if strClosedDate != "" {
+				if strClosedDate != "" && strStatus != "status.onHold" {
 					espXmlmc.SetParam(strAttribute, strClosedDate)
 				}
 			}
@@ -1515,9 +1518,7 @@ func logNewCall(callClass string, callMap map[string]interface{}, swCallID strin
 			// Now handle calls in an On Hold status
 			if strStatus == "status.onHold" {
 				espXmlmc.SetParam("requestId", strNewCallRef)
-				if strClosedDate != "" {
-					espXmlmc.SetParam("onHoldUntil", strClosedDate)
-				}
+				espXmlmc.SetParam("onHoldUntil", strClosedDate)
 				espXmlmc.SetParam("strReason", "Request imported from Supportworks in an On Hold status. See Historical Request Updates for further information.")
 				XMLBPM, xmlmcErr := espXmlmc.Invoke("apps/"+appServiceManager+"/Requests", "holdRequest")
 				if xmlmcErr != nil {
@@ -1780,7 +1781,7 @@ func getFieldValue(v string, u map[string]interface{}) string {
 //getSiteID takes the Call Record and returns a correct Site ID if one exists on the Instance
 func getSiteID(callMap map[string]interface{}) (string, string) {
 	siteID := ""
-	siteNameMapping := fmt.Sprintf("%v", mapGenericConf.CoreFieldMapping["site"])
+	siteNameMapping := fmt.Sprintf("%v", mapGenericConf.CoreFieldMapping["h_site_id"])
 	siteName := getFieldValue(siteNameMapping, callMap)
 	if siteName != "" {
 		siteIsInCache, SiteIDCache := recordInCache(siteName, "Site")
@@ -1799,12 +1800,11 @@ func getSiteID(callMap map[string]interface{}) (string, string) {
 }
 
 //getCallServiceID takes the Call Record and returns a correct Service ID if one exists on the Instance
-func getCallServiceID(callMap map[string]interface{}) string {
+func getCallServiceID(swService string) string {
 	serviceID := ""
-	serviceNameMapping := fmt.Sprintf("%v", mapGenericConf.CoreFieldMapping["serviceId"])
-	serviceName := getFieldValue(serviceNameMapping, callMap)
-	if swImportConf.ServiceMapping[serviceName] != nil {
-		serviceName = fmt.Sprintf("%s", swImportConf.ServiceMapping[serviceName])
+	serviceName := ""
+	if swImportConf.ServiceMapping[swService] != nil {
+		serviceName = fmt.Sprintf("%s", swImportConf.ServiceMapping[swService])
 
 		if serviceName != "" {
 			serviceID = getServiceID(serviceName)
@@ -1833,18 +1833,15 @@ func getServiceID(serviceName string) string {
 }
 
 //getCallPriorityID takes the Call Record and returns a correct Priority ID if one exists on the Instance
-func getCallPriorityID(callMap map[string]interface{}) (string, string) {
+func getCallPriorityID(strPriorityName string) (string, string) {
 	priorityID := ""
-	priorityNameMapping := fmt.Sprintf("%v", mapGenericConf.CoreFieldMapping["priorityId"])
-	priorityName := getFieldValue(priorityNameMapping, callMap)
-	if swImportConf.PriorityMapping[priorityName] != nil {
-		priorityName = fmt.Sprintf("%s", swImportConf.PriorityMapping[priorityName])
-
-		if priorityName != "" {
-			priorityID = getPriorityID(priorityName)
+	if swImportConf.PriorityMapping[strPriorityName] != nil {
+		strPriorityName = fmt.Sprintf("%s", swImportConf.PriorityMapping[strPriorityName])
+		if strPriorityName != "" {
+			priorityID = getPriorityID(strPriorityName)
 		}
 	}
-	return priorityID, priorityName
+	return priorityID, strPriorityName
 }
 
 //getPriorityID takes a Priority Name string and returns a correct Priority ID if one exists in the cache or on the Instance
@@ -1867,12 +1864,11 @@ func getPriorityID(priorityName string) string {
 }
 
 //getCallTeamID takes the Call Record and returns a correct Team ID if one exists on the Instance
-func getCallTeamID(callMap map[string]interface{}) (string, string) {
+func getCallTeamID(swTeamID string) (string, string) {
 	teamID := ""
-	teamNameMapping := fmt.Sprintf("%v", mapGenericConf.CoreFieldMapping["teamId"])
-	teamName := getFieldValue(teamNameMapping, callMap)
-	if swImportConf.TeamMapping[teamName] != nil {
-		teamName = fmt.Sprintf("%s", swImportConf.TeamMapping[teamName])
+	teamName := ""
+	if swImportConf.TeamMapping[swTeamID] != nil {
+		teamName = fmt.Sprintf("%s", swImportConf.TeamMapping[swTeamID])
 		if teamName != "" {
 			teamID = getTeamID(teamName)
 		}
@@ -1919,7 +1915,7 @@ func getCallCategoryID(callMap map[string]interface{}, categoryGroup string) (st
 		}
 
 	} else {
-		categoryNameMapping = fmt.Sprintf("%v", mapGenericConf.AdditionalFieldMapping["h_closure_category_id"])
+		categoryNameMapping = fmt.Sprintf("%v", mapGenericConf.CoreFieldMapping["h_closure_category_id"])
 		categoryCode = getFieldValue(categoryNameMapping, callMap)
 		if swImportConf.ResolutionCategoryMapping[categoryCode] != nil {
 			//Get Category Code from JSON mapping

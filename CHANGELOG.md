@@ -1,3 +1,10 @@
+## 1.2.3 (May 9th, 2016)
+
+Defect Fixes:
+
+- Fixed data mapping issues
+- Fixed issue where imported calls in a status of On Hold could not be taken off hold  
+
 ## 1.2.2 (April 29th, 2016)
 
 Features:
