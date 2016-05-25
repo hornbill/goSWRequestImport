@@ -45,8 +45,8 @@ When running the import tool, after the call records are imported, you will rece
 * Open Command Line Prompt as Administrator
 * Change Directory to the folder containing the extracted files `C:\sw_call_import\`
 * Run the command relevant to the computer you are running this on:
-** For 32 Bit Windows Machines : sw_call_import_w32.exe -dryrun=true
-** For 64 Bit Windows Machines : sw_call_import_w64.exe -dryrun=true
+* - For 32 Bit Windows Machines : sw_call_import_w32.exe -dryrun=true
+* - For 64 Bit Windows Machines : sw_call_import_w64.exe -dryrun=true
 
 # Configuration
 
@@ -545,7 +545,7 @@ Command Line Parameters
 * file - Defaults to `conf.json` - Name of the Configuration file to load
 * dryrun - Defaults to `false` - Set to True and the XMLMC for new request creation will not be called and instead the XML will be dumped to the log file, this is to aid in debugging the initial connection information.
 * zone - Defaults to `eur` - Allows you to change the ZONE used for creating the XMLMC EndPoint URL https://{ZONE}api.hornbill.com/{INSTANCE}/
-* concurrent - defaults to `1`. This is to specify the number of requests that should be imported concurrently, and can be an integer between 1 and 10 (inclusive). 1 is the slowest level of import, but does not affect performance of your Hornbill instance, and 10 will process the import much more quickly but could affect performance. 
+* concurrent - defaults to `1`. This is to specify the number of requests that should be imported concurrently, and can be an integer between 1 and 10 (inclusive). 1 is the slowest level of import, but does not affect performance of your Hornbill instance, and 10 will process the import much more quickly but could affect performance.
 
 # Testing
 If you run the application with the argument dryrun=true then no requests will be logged - the XML used to raise requests will instead be saved in to the log file so you can ensure the data mappings are correct before running the import.
