@@ -26,16 +26,14 @@ import (
 )
 
 const (
-	version           = "1.2.3"
+	version           = "1.2.4"
 	appServiceManager = "com.hornbill.servicemanager"
 	//Disk Space Declarations
-	sizeKB            float64 = 1 << (10 * 1)
-	sizeMB            float64 = 1 << (10 * 2)
-	sizeGB            float64 = 1 << (10 * 3)
-	sizeTB            float64 = 1 << (10 * 4)
-	sizePB            float64 = 1 << (10 * 5)
-	maxGoroutines     int     = 15
-	maxFileGoroutines int     = 10
+	sizeKB float64 = 1 << (10 * 1)
+	sizeMB float64 = 1 << (10 * 2)
+	sizeGB float64 = 1 << (10 * 3)
+	sizeTB float64 = 1 << (10 * 4)
+	sizePB float64 = 1 << (10 * 5)
 )
 
 var (
@@ -49,6 +47,7 @@ var (
 	configFileName       string
 	configZone           string
 	configDryRun         bool
+	configMaxRoutines    string
 	connStrSysDB         string
 	connStrAppDB         string
 	counters             counterTypeStruct
@@ -84,6 +83,7 @@ var (
 	wgAssoc              sync.WaitGroup
 	wgFile               sync.WaitGroup
 	reqPrefix            string
+	maxGoroutines        = 1
 )
 
 // ----- Structures -----
@@ -99,6 +99,7 @@ type swImportConfStruct struct {
 	SWServerAddress           string
 	AttachmentRoot            string
 	CustomerType              string
+	SMProfileCodeSeperator    string
 	SWSystemDBConf            sysDBConfStruct //Cache Data (sw_systemdb) connection details
 	SWAppDBConf               appDBConfStruct //App Data (swdata) connection details
 	ConfIncident              swCallConfStruct
@@ -165,7 +166,7 @@ type stateStruct struct {
 type xmlmcSysSettingResponse struct {
 	MethodResult string      `xml:"status,attr"`
 	State        stateStruct `xml:"state"`
-	Setting      string         `xml:"params>option>value"`
+	Setting      string      `xml:"params>option>value"`
 }
 
 //----- Request Logged Structs
@@ -358,6 +359,7 @@ func main() {
 	flag.StringVar(&configFileName, "file", "conf.json", "Name of the configuration file to load")
 	flag.StringVar(&configZone, "zone", "eur", "Override the default Zone the instance sits in")
 	flag.BoolVar(&configDryRun, "dryrun", false, "Dump import XML to log instead of creating requests")
+	flag.StringVar(&configMaxRoutines, "concurrent", "1", "Maximum number of requests to import concurrently.")
 	flag.Parse()
 
 	//-- Output to CLI and Log
@@ -365,6 +367,22 @@ func main() {
 	logger(1, "Flag - Config File "+fmt.Sprintf("%s", configFileName), true)
 	logger(1, "Flag - Zone "+fmt.Sprintf("%s", configZone), true)
 	logger(1, "Flag - Dry Run "+fmt.Sprintf("%v", configDryRun), true)
+	logger(1, "Flag - Concurrent Requests "+fmt.Sprintf("%v", configMaxRoutines), true)
+
+	//Check maxGoroutines for valid value
+	maxRoutines, err := strconv.Atoi(configMaxRoutines)
+	if err != nil {
+		color.Red("Unable to convert maximum concurrency of [" + configMaxRoutines + "] to type INT for processing")
+		return
+	}
+	maxGoroutines = maxRoutines
+
+	if maxGoroutines < 1 || maxGoroutines > 10 {
+		color.Red("The maximum concurrent requests allowed is between 1 and 10 (inclusive).\n\n")
+		color.Red("You have selected " + configMaxRoutines + ". Please try again, with a valid value against ")
+		color.Red("the -concurrent switch.")
+		return
+	}
 
 	//-- Load Configuration File Into Struct
 	swImportConf, boolConfLoaded = loadConfig()
@@ -597,9 +615,7 @@ func processFileAttachments() {
 
 		logger(3, " Processing "+fmt.Sprintf("%v", len(importFiles))+" attachments for "+fmt.Sprintf("%v", len(callLevel))+" requests...", true)
 		bar := pb.StartNew(len(importFiles))
-
-		//fmt.Println("Maximum Request File Attachment Go Routines:", maxFileGoroutines)
-		maxGoroutinesGuard := make(chan struct{}, maxFileGoroutines)
+		maxGoroutinesGuard := make(chan struct{}, maxGoroutines)
 		for _, fileRecord := range importFiles {
 
 			maxGoroutinesGuard <- struct{}{}
@@ -647,7 +663,7 @@ func decodeSWMFile(fileEncoded string) (string, string) {
 	espXmlmc.SetParam("fileContent", fileEncoded)
 	XMLEmailDecoded, xmlmcErrEmail := espXmlmc.Invoke("mail", "decodeCompositeMessage")
 	if xmlmcErrEmail != nil {
-		log.Fatal(xmlmcErrEmail)
+		logger(5, "API Error response from decodeCompositeMessage: "+fmt.Sprintf("%v", xmlmcErrEmail), false)
 		return emailContent, subjectLine
 	}
 	var xmlResponEmail xmlmcEmailAttachmentResponse
@@ -843,17 +859,24 @@ func addFileContent(entityName string, fileRecord fileAssocStruct) bool {
 					strService = "data"
 					strMethod = "entityUpdateRecord"
 				} else {
-					espXmlmc.SetParam("requestId", fileRecord.SmCallRef)
-					espXmlmc.SetParam("fileName", fileRecord.FileName)
-					espXmlmc.SetParam("fileSource", xmlRespon.ContentLocation)
+					espXmlmc.SetParam("application", appServiceManager)
+					espXmlmc.SetParam("entity", "RequestAttachments")
+					espXmlmc.OpenElement("primaryEntityData")
+					espXmlmc.OpenElement("record")
+					espXmlmc.SetParam("h_request_id", fileRecord.SmCallRef)
 					if subjectLine != "" {
-						espXmlmc.SetParam("description", subjectLine+" - Originally added by "+fileRecord.AddedBy)
+						espXmlmc.SetParam("h_description", subjectLine+" - Originally added by "+fileRecord.AddedBy)
 					} else {
-						espXmlmc.SetParam("description", "Originally added by "+fileRecord.AddedBy)
+						espXmlmc.SetParam("h_description", "Originally added by "+fileRecord.AddedBy)
 					}
-					espXmlmc.SetParam("visibility", "trustedGuest")
-					strService = "apps/" + appServiceManager + "/Requests"
-					strMethod = "attachFileFromServer"
+					espXmlmc.SetParam("h_filename", fileRecord.FileName)
+					espXmlmc.SetParam("h_contentlocation", xmlRespon.ContentLocation)
+					espXmlmc.SetParam("h_timestamp", fileRecord.TimeAdded)
+					espXmlmc.SetParam("h_visibility", "trustedGuest")
+					espXmlmc.CloseElement("record")
+					espXmlmc.CloseElement("primaryEntityData")
+					strService = "data"
+					strMethod = "entityAddRecord"
 				}
 				XMLSTRINGDATA = espXmlmc.GetParam()
 				XMLContentLoc, xmlmcErrContent := espXmlmc.Invoke(strService, strMethod)
@@ -936,17 +959,17 @@ func getInstanceFreeSpace() (int64, int64, string, string) {
 
 	XMLAudit, xmlmcErr := espXmlmc.Invoke("admin", "getInstanceAuditInfo")
 	if xmlmcErr != nil {
-		logger(4, "Could not return Instance Audit Information: "+fmt.Sprintf("%v", xmlmcErr), false)
-		log.Fatal(xmlmcErr)
+		logger(4, "Could not return Instance Audit Information: "+fmt.Sprintf("%v", xmlmcErr), true)
+		return 0, 0, "0B", "0B"
 	}
 	var xmlRespon xmlmcAuditListResponse
 
 	err := xml.Unmarshal([]byte(XMLAudit), &xmlRespon)
 	if err != nil {
-		logger(4, "Could not return Instance Audit Information: "+fmt.Sprintf("%v", err), false)
+		logger(4, "Could not return Instance Audit Information: "+fmt.Sprintf("%v", err), true)
 	} else {
 		if xmlRespon.MethodResult != "ok" {
-			logger(4, "Could not return Instance Audit Information: "+xmlRespon.State.ErrorRet, false)
+			logger(4, "Could not return Instance Audit Information: "+xmlRespon.State.ErrorRet, true)
 		} else {
 			//-- Check Response
 			if xmlRespon.TotalStorage > 0 && xmlRespon.TotalStorageUsed > 0 {
@@ -1032,7 +1055,9 @@ func addAssocRecord(masterRef, slaveRef string) {
 	espXmlmc.CloseElement("primaryEntityData")
 	XMLUpdate, xmlmcErr := espXmlmc.Invoke("data", "entityAddRecord")
 	if xmlmcErr != nil {
-		log.Fatal(xmlmcErr)
+		//		log.Fatal(xmlmcErr)
+		logger(4, "Unable to create Request Association between ["+masterRef+"] and ["+slaveRef+"] :"+fmt.Sprintf("%v", xmlmcErr), false)
+		return
 	}
 	var xmlRespon xmlmcResponse
 	errXMLMC := xml.Unmarshal([]byte(XMLUpdate), &xmlRespon)
@@ -1319,7 +1344,7 @@ func logNewCall(callClass string, callMap map[string]interface{}, swCallID strin
 		}
 
 		// Resolved Date/Time
-		if strAttribute == "h_dateresolved" && strMapping != ""  && (strStatus == "status.resolved" || strStatus == "status.closed") {
+		if strAttribute == "h_dateresolved" && strMapping != "" && (strStatus == "status.resolved" || strStatus == "status.closed") {
 			resolvedEPOCH := getFieldValue(strMapping, callMap)
 			if resolvedEPOCH != "" && resolvedEPOCH != "0" {
 				strResolvedDate := epochToDateTime(resolvedEPOCH)
@@ -1405,7 +1430,9 @@ func logNewCall(callClass string, callMap map[string]interface{}, swCallID strin
 
 		XMLCreate, xmlmcErr := espXmlmc.Invoke("data", "entityAddRecord")
 		if xmlmcErr != nil {
-			log.Fatal(xmlmcErr)
+			//log.Fatal(xmlmcErr)
+			logger(4, "Unable to log request on Hornbill instance:"+fmt.Sprintf("%v", xmlmcErr), false)
+			return false, "No"
 		}
 		var xmlRespon xmlmcRequestResponseStruct
 
@@ -1446,7 +1473,8 @@ func logNewCall(callClass string, callMap map[string]interface{}, swCallID strin
 				espXmlmc.CloseElement("primaryEntityData")
 				XMLBPM, xmlmcErr := espXmlmc.Invoke("data", "entityUpdateRecord")
 				if xmlmcErr != nil {
-					log.Fatal(xmlmcErr)
+					//log.Fatal(xmlmcErr)
+					logger(4, "Unable to update Log Date of request ["+strNewCallRef+"] : "+fmt.Sprintf("%v", xmlmcErr), false)
 				}
 				var xmlRespon xmlmcResponse
 
@@ -1475,7 +1503,8 @@ func logNewCall(callClass string, callMap map[string]interface{}, swCallID strin
 
 					XMLBPM, xmlmcErr := espXmlmc.Invoke("bpm", "processSpawn")
 					if xmlmcErr != nil {
-						log.Fatal(xmlmcErr)
+						//log.Fatal(xmlmcErr)
+						logger(4, "Unable to invoke BPM for request ["+strNewCallRef+"]: "+fmt.Sprintf("%v", xmlmcErr), false)
 					}
 					var xmlRespon xmlmcBPMSpawnedStruct
 
@@ -1499,7 +1528,8 @@ func logNewCall(callClass string, callMap map[string]interface{}, swCallID strin
 
 						XMLBPMUpdate, xmlmcErr := espXmlmc.Invoke("data", "entityUpdateRecord")
 						if xmlmcErr != nil {
-							log.Fatal(xmlmcErr)
+							//log.Fatal(xmlmcErr)
+							logger(4, "Unable to associated spawned BPM to request ["+strNewCallRef+"]: "+fmt.Sprintf("%v", xmlmcErr), false)
 						}
 						var xmlRespon xmlmcResponse
 
@@ -1522,7 +1552,8 @@ func logNewCall(callClass string, callMap map[string]interface{}, swCallID strin
 				espXmlmc.SetParam("strReason", "Request imported from Supportworks in an On Hold status. See Historical Request Updates for further information.")
 				XMLBPM, xmlmcErr := espXmlmc.Invoke("apps/"+appServiceManager+"/Requests", "holdRequest")
 				if xmlmcErr != nil {
-					log.Fatal(xmlmcErr)
+					//log.Fatal(xmlmcErr)
+					logger(4, "Unable to place request on hold ["+strNewCallRef+"] : "+fmt.Sprintf("%v", xmlmcErr), false)
 				}
 				var xmlRespon xmlmcResponse
 
@@ -1602,10 +1633,10 @@ func applyHistoricalUpdates(newCallRef, swCallRef string) bool {
 				diaryTimex := ""
 				if updateTime, ok := diaryEntry["updatetimex"].(int64); ok {
 					diaryTimex = strconv.FormatInt(updateTime, 10)
-					} else {
-						diaryTimex = fmt.Sprintf("%+s", diaryEntry["updatetimex"])
-					}
-					diaryTime = epochToDateTime(diaryTimex)
+				} else {
+					diaryTimex = fmt.Sprintf("%+s", diaryEntry["updatetimex"])
+				}
+				diaryTime = epochToDateTime(diaryTimex)
 			}
 
 			//Check for source/code/text having nil value
@@ -1629,27 +1660,27 @@ func applyHistoricalUpdates(newCallRef, swCallRef string) bool {
 			if diaryEntry["udindex"] != nil {
 				if updateIndex, ok := diaryEntry["udindex"].(int64); ok {
 					diaryIndex = strconv.FormatInt(updateIndex, 10)
-					} else {
-						diaryIndex = fmt.Sprintf("%+s", diaryEntry["udindex"])
-					}
+				} else {
+					diaryIndex = fmt.Sprintf("%+s", diaryEntry["udindex"])
+				}
 			}
 
 			diaryTimeSpent := ""
 			if diaryEntry["timespent"] != nil {
 				if updateSpent, ok := diaryEntry["timespent"].(int64); ok {
 					diaryTimeSpent = strconv.FormatInt(updateSpent, 10)
-					} else {
-						diaryTimeSpent = fmt.Sprintf("%+s", diaryEntry["timespent"])
-					}
+				} else {
+					diaryTimeSpent = fmt.Sprintf("%+s", diaryEntry["timespent"])
+				}
 			}
 
 			diaryType := ""
 			if diaryEntry["udtype"] != nil {
 				if updateType, ok := diaryEntry["udtype"].(int64); ok {
 					diaryType = strconv.FormatInt(updateType, 10)
-					} else {
-						diaryType = fmt.Sprintf("%+s", diaryEntry["udtype"])
-					}
+				} else {
+					diaryType = fmt.Sprintf("%+s", diaryEntry["udtype"])
+				}
 			}
 
 			espXmlmc.SetParam("application", appServiceManager)
@@ -1685,7 +1716,8 @@ func applyHistoricalUpdates(newCallRef, swCallRef string) bool {
 			if configDryRun != true {
 				XMLUpdate, xmlmcErr := espXmlmc.Invoke("data", "entityAddRecord")
 				if xmlmcErr != nil {
-					log.Fatal(xmlmcErr)
+					//log.Fatal(xmlmcErr)
+					logger(3, "Unable to add Historical Call Diary Update: "+fmt.Sprintf("%v", xmlmcErr), false)
 				}
 				var xmlRespon xmlmcResponse
 				errXMLMC := xml.Unmarshal([]byte(XMLUpdate), &xmlRespon)
@@ -1909,8 +1941,10 @@ func getCallCategoryID(callMap map[string]interface{}, categoryGroup string) (st
 			if swImportConf.CategoryMapping[categoryCode] != nil {
 				categoryCode = fmt.Sprintf("%s", swImportConf.CategoryMapping[categoryCode])
 			} else {
-				//Mapping doesn't exist - replace hyphens from SW Profile code with colon, and try to use this
-				categoryCode = strings.Replace(categoryCode, ":", "-", -1)
+				//Mapping doesn't exist - replace hyphens from SW Profile code with another string, and try to use this
+				//SMProfileCodeSeperator allows us to specify in the config, the seperator used within Service Manager
+				//profile codes
+				categoryCode = strings.Replace(categoryCode, swImportConf.SMProfileCodeSeperator, "-", -1)
 			}
 		}
 
@@ -2176,7 +2210,8 @@ func searchSite(siteName string) (bool, int) {
 	XMLSiteSearch, xmlmcErr := espXmlmc.Invoke("data", "entityBrowseRecords")
 	if xmlmcErr != nil {
 		logger(4, "Unable to Search for Site: "+fmt.Sprintf("%v", xmlmcErr), false)
-		log.Fatal(xmlmcErr)
+		return boolReturn, intReturn
+		//log.Fatal(xmlmcErr)
 	}
 	var xmlRespon xmlmcSiteListResponse
 
@@ -2228,7 +2263,8 @@ func searchPriority(priorityName string) (bool, int) {
 	XMLPrioritySearch, xmlmcErr := espXmlmc.Invoke("data", "entityBrowseRecords")
 	if xmlmcErr != nil {
 		logger(4, "Unable to Search for Priority: "+fmt.Sprintf("%v", xmlmcErr), false)
-		log.Fatal(xmlmcErr)
+		return boolReturn, intReturn
+		//log.Fatal(xmlmcErr)
 	}
 	var xmlRespon xmlmcPriorityListResponse
 
@@ -2280,7 +2316,8 @@ func searchService(serviceName string) (bool, int) {
 	XMLServiceSearch, xmlmcErr := espXmlmc.Invoke("data", "entityBrowseRecords")
 	if xmlmcErr != nil {
 		logger(4, "Unable to Search for Service: "+fmt.Sprintf("%v", xmlmcErr), false)
-		log.Fatal(xmlmcErr)
+		//log.Fatal(xmlmcErr)
+		return boolReturn, intReturn
 	}
 	var xmlRespon xmlmcServiceListResponse
 
@@ -2337,7 +2374,8 @@ func searchTeam(teamName string) (bool, string) {
 	XMLTeamSearch, xmlmcErr := espXmlmc.Invoke("data", "entityBrowseRecords")
 	if xmlmcErr != nil {
 		logger(4, "Unable to Search for Team: "+fmt.Sprintf("%v", xmlmcErr), true)
-		log.Fatal(xmlmcErr)
+		//log.Fatal(xmlmcErr)
+		return boolReturn, strReturn
 	}
 	var xmlRespon xmlmcTeamListResponse
 
@@ -2385,7 +2423,8 @@ func searchCategory(categoryCode, categoryGroup string) (bool, string, string) {
 	XMLCategorySearch, xmlmcErr := espXmlmc.Invoke("data", "profileCodeLookup")
 	if xmlmcErr != nil {
 		logger(4, "Unable to Search for "+categoryGroup+" Category: "+fmt.Sprintf("%v", xmlmcErr), false)
-		log.Fatal(xmlmcErr)
+		//log.Fatal(xmlmcErr)
+		return boolReturn, idReturn, strReturn
 	}
 	var xmlRespon xmlmcCategoryListResponse
 

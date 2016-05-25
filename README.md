@@ -39,12 +39,14 @@ When running the import tool, after the call records are imported, you will rece
 # Installation
 
 #### Windows
-* Download the archive containing the import executable
+* Download the archive containing the import executables
 * Extract zip into a folder you would like the application to run from e.g. `C:\sw_call_import\`
 * Open '''conf.json''' and add in the necessary configuration
 * Open Command Line Prompt as Administrator
-* Change Directory to the folder with sw_call_import.exe `C:\sw_call_import\`
-* Run the command sw_call_import.exe -dryrun=true
+* Change Directory to the folder containing the extracted files `C:\sw_call_import\`
+* Run the command relevant to the computer you are running this on:
+** For 32 Bit Windows Machines : sw_call_import_w32.exe -dryrun=true
+** For 64 Bit Windows Machines : sw_call_import_w64.exe -dryrun=true
 
 # Configuration
 
@@ -74,6 +76,7 @@ Example JSON File:
     "Encrypt": false
   },
   "CustomerType": "0",
+  "SMProfileCodeSeperator": ":",
   "ConfIncident": {
     "Import":false,
     "CallClass": "Incident",
@@ -492,6 +495,10 @@ Integer value 0 or 1, to determine the customer type for the records being impor
 * 0 - Hornbill Users
 * 1 - Hornbill Contacts
 
+
+#### SMProfileCodeSeperator
+A string, to specify the Profile Code seperator character in use on your Service Manager instance. By default this is a :
+
 #### ConfCallClass
 Contains request-class specific configuration. This section should be repeated for all Service Manager Call Classes.
 * Import - boolean true/false. Specifies whether the current class section should be included in the import.
@@ -538,6 +545,7 @@ Command Line Parameters
 * file - Defaults to `conf.json` - Name of the Configuration file to load
 * dryrun - Defaults to `false` - Set to True and the XMLMC for new request creation will not be called and instead the XML will be dumped to the log file, this is to aid in debugging the initial connection information.
 * zone - Defaults to `eur` - Allows you to change the ZONE used for creating the XMLMC EndPoint URL https://{ZONE}api.hornbill.com/{INSTANCE}/
+* concurrent - defaults to `1`. This is to specify the number of requests that should be imported concurrently, and can be an integer between 1 and 10 (inclusive). 1 is the slowest level of import, but does not affect performance of your Hornbill instance, and 10 will process the import much more quickly but could affect performance. 
 
 # Testing
 If you run the application with the argument dryrun=true then no requests will be logged - the XML used to raise requests will instead be saved in to the log file so you can ensure the data mappings are correct before running the import.

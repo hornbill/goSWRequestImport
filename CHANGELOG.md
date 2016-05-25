@@ -1,3 +1,12 @@
+## 1.2.4 (May 25th, 2016)
+
+Features:
+- Now includes 32bit and 64bit Windows executables
+- Added -concurrent flag, allowing you to specify the maximum number of requests to be imported concurrently
+- Improved performance when importing file attachments
+- Added ability to specify Service Manager Profile Code separation character
+- Improved client-side import logging.
+
 ## 1.2.3 (May 9th, 2016)
 
 Defect Fixes:

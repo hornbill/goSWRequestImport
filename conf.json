@@ -21,6 +21,7 @@
     "Encrypt": false
   },
   "CustomerType": "0",
+  "SMProfileCodeSeperator": ":",
   "ConfIncident": {
     "Import":false,
     "CallClass": "Incident",
