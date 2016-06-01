@@ -1,3 +1,10 @@
+## 1.2.5 (May 31st, 2016)
+
+Defect Fixes:
+
+- Writing of duplicate Request profile codes failing
+- Historic Update File Attachments with a .SWM extension importing but not accessible through Service Manager Request UI
+
 ## 1.2.4 (May 25th, 2016)
 
 Features:

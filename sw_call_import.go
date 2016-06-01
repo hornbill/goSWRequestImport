@@ -26,7 +26,7 @@ import (
 )
 
 const (
-	version           = "1.2.4" 
+	version           = "1.2.5"
 	appServiceManager = "com.hornbill.servicemanager"
 	//Disk Space Declarations
 	sizeKB float64 = 1 << (10 * 1)
@@ -632,12 +632,13 @@ func processFileAttachments() {
 
 			go func() {
 				defer wgFile.Done()
-				time.Sleep(10 * time.Millisecond)
-
+				time.Sleep(150 * time.Millisecond)
 				mutexBar.Lock()
 				bar.Increment()
 				mutexBar.Unlock()
+
 				addFileContent(entityRequest, objFileRecord)
+
 				<-maxGoroutinesGuard
 			}()
 		}
@@ -713,51 +714,6 @@ func decodeSWMFile(fileEncoded string) (string, string) {
 
 //addFileContent - reads the file attachment from Supportworks, attach to request and update content location
 func addFileContent(entityName string, fileRecord fileAssocStruct) bool {
-	espXmlmc, sessErr := NewEspXmlmcSession()
-	if sessErr != nil {
-		logger(4, "Unable to attach to XMLMC session to add file record.", true)
-		return false
-	}
-	if entityName == "RequestHistoricUpdateAttachments" {
-		espXmlmc.SetParam("application", appServiceManager)
-		espXmlmc.SetParam("entity", "RequestHistoricUpdateAttachments")
-		espXmlmc.OpenElement("primaryEntityData")
-		espXmlmc.OpenElement("record")
-		espXmlmc.SetParam("h_addedby", fileRecord.AddedBy)
-		espXmlmc.SetParam("h_callref", fileRecord.SmCallRef)
-		espXmlmc.SetParam("h_compressed", fileRecord.Compressed)
-		espXmlmc.SetParam("h_dataid", fileRecord.DataID)
-		espXmlmc.SetParam("h_filename", fileRecord.FileName)
-		espXmlmc.SetParam("h_filetime", fileRecord.FileTime)
-		espXmlmc.SetParam("h_pk_fileid", fileRecord.FileID)
-		espXmlmc.SetParam("h_sizec", strconv.Itoa(int(fileRecord.SizeC)))
-		espXmlmc.SetParam("h_sizeu", strconv.Itoa(int(fileRecord.SizeU)))
-		espXmlmc.SetParam("h_timeadded", fileRecord.TimeAdded)
-		espXmlmc.SetParam("h_updateid", fileRecord.UpdateID)
-		espXmlmc.CloseElement("record")
-		espXmlmc.CloseElement("primaryEntityData")
-
-		var XMLSTRING = espXmlmc.GetParam()
-
-		XMLHistAtt, xmlmcErr := espXmlmc.Invoke("data", "entityAddRecord")
-		if xmlmcErr != nil {
-			logger(1, "File Attachment Record XML "+fmt.Sprintf("%s", XMLSTRING), false)
-			return false
-		}
-		var xmlRespon xmlmcResponse
-		errXMLMC := xml.Unmarshal([]byte(XMLHistAtt), &xmlRespon)
-		if errXMLMC != nil {
-			logger(4, "Unable to read response from Hornbill instance for File Attachment Record Insertion ["+fileRecord.SmCallRef+"]:"+fmt.Sprintf("%v", errXMLMC), false)
-			logger(1, "File Attachment Record XML "+fmt.Sprintf("%s", XMLSTRING), false)
-			return false
-		}
-		if xmlRespon.MethodResult != "ok" {
-			logger(4, "Unable to process File Attachment Record Insertion ["+fileRecord.SmCallRef+"]: "+xmlRespon.State.ErrorRet, false)
-			logger(1, "File Attachment Record XML "+fmt.Sprintf("%s", XMLSTRING), false)
-			return false
-		}
-		logger(1, "Historic Update File Attactment Record Insertion Success ["+fileRecord.SmCallRef+"]", false)
-	}
 
 	subFolderName := getSubFolderName(fileRecord.CallRef)
 	hostFileName := padCallRef(fileRecord.CallRef, "f", 8) + "." + padCallRef(fileRecord.DataID, "", 3)
@@ -795,15 +751,65 @@ func addFileContent(entityName string, fileRecord fileAssocStruct) bool {
 	fileExtension := filepath.Ext(fileRecord.FileName)
 	swmDecoded := ""
 	subjectLine := ""
+	useFileName := fileRecord.FileName;
 	if fileExtension == ".swm" {
 		//Further processing for SWM files
 		//Copy content in to TXT file, and attach this instead
 		swmDecoded, subjectLine = decodeSWMFile(fileEncoded)
 		if swmDecoded != "" {
 			fileEncoded = base64.StdEncoding.EncodeToString([]byte(swmDecoded))
-			fileRecord.FileName = strings.TrimSuffix(fileRecord.FileName, fileExtension) + ".txt"
 		}
+		useFileName = useFileName + ".txt"
 	}
+
+	if entityName == "RequestHistoricUpdateAttachments" {
+		espXmlmc, sessErr := NewEspXmlmcSession()
+		if sessErr != nil {
+			logger(4, "Unable to attach to XMLMC session to add file record.", true)
+			return false
+		}
+		espXmlmc.SetParam("application", appServiceManager)
+		espXmlmc.SetParam("entity", "RequestHistoricUpdateAttachments")
+		espXmlmc.OpenElement("primaryEntityData")
+		espXmlmc.OpenElement("record")
+		espXmlmc.SetParam("h_addedby", fileRecord.AddedBy)
+		espXmlmc.SetParam("h_callref", fileRecord.SmCallRef)
+		espXmlmc.SetParam("h_compressed", fileRecord.Compressed)
+		espXmlmc.SetParam("h_dataid", fileRecord.DataID)
+		espXmlmc.SetParam("h_filename", useFileName)
+		espXmlmc.SetParam("h_filetime", fileRecord.FileTime)
+		espXmlmc.SetParam("h_pk_fileid", fileRecord.FileID)
+		espXmlmc.SetParam("h_sizec", strconv.Itoa(int(fileRecord.SizeC)))
+		espXmlmc.SetParam("h_sizeu", strconv.Itoa(int(fileRecord.SizeU)))
+		espXmlmc.SetParam("h_timeadded", fileRecord.TimeAdded)
+		espXmlmc.SetParam("h_updateid", fileRecord.UpdateID)
+		espXmlmc.CloseElement("record")
+		espXmlmc.CloseElement("primaryEntityData")
+
+		var XMLSTRING = espXmlmc.GetParam()
+
+		XMLHistAtt, xmlmcErr := espXmlmc.Invoke("data", "entityAddRecord")
+		if xmlmcErr != nil {
+			logger(1, "RequestHistoricUpdateAttachments entityAddRecord Failed "+fmt.Sprintf("%s", xmlmcErr), false)
+			logger(1, "RequestHistoricUpdateAttachments entityAddRecord Failed File Attachment Record XML "+fmt.Sprintf("%s", XMLSTRING), false)
+			return false
+		}
+		var xmlRespon xmlmcResponse
+		errXMLMC := xml.Unmarshal([]byte(XMLHistAtt), &xmlRespon)
+		if errXMLMC != nil {
+			logger(4, "Unable to read response from Hornbill instance for Update File Attachment Record Insertion ["+useFileName+"] ["+fileRecord.SmCallRef+"]:"+fmt.Sprintf("%v", errXMLMC), false)
+			logger(1, "File Attachment Record XML "+fmt.Sprintf("%s", XMLSTRING), false)
+			return false
+		}
+		if xmlRespon.MethodResult != "ok" {
+			logger(4, "Unable to process Update File Attachment Record Insertion ["+useFileName+"] ["+fileRecord.SmCallRef+"]: "+xmlRespon.State.ErrorRet, false)
+			logger(1, "File Attachment Record XML "+fmt.Sprintf("%s", XMLSTRING), false)
+			return false
+		}
+		logger(1, "Historic Update File Attactment Record Insertion Success ["+useFileName+"] ["+fileRecord.SmCallRef+"]", false)
+	}
+
+
 
 	espXmlmc, sessErr2 := NewEspXmlmcSession()
 	if sessErr2 != nil {
@@ -816,14 +822,14 @@ func addFileContent(entityName string, fileRecord fileAssocStruct) bool {
 	espXmlmc.SetParam("keyValue", attPriKey)
 	espXmlmc.SetParam("folder", "/")
 	espXmlmc.OpenElement("localFile")
-	espXmlmc.SetParam("fileName", fileRecord.FileName)
+	espXmlmc.SetParam("fileName", useFileName)
 	espXmlmc.SetParam("fileData", fileEncoded)
 	espXmlmc.CloseElement("localFile")
 	espXmlmc.SetParam("overwrite", "true")
 	var XMLSTRINGDATA = espXmlmc.GetParam()
 	XMLAttach, xmlmcErr := espXmlmc.Invoke("data", "entityAttachFile")
 	if xmlmcErr != nil {
-		logger(4, "Could not add Attachment File Data for ["+fileRecord.SmCallRef+"]: "+fmt.Sprintf("%v", xmlmcErr), false)
+		logger(4, "Could not add Attachment File Data for ["+useFileName+"] ["+fileRecord.SmCallRef+"]: "+fmt.Sprintf("%v", xmlmcErr), false)
 		logger(1, "File Data Record XML "+fmt.Sprintf("%s", XMLSTRINGDATA), false)
 		return false
 	}
@@ -831,11 +837,11 @@ func addFileContent(entityName string, fileRecord fileAssocStruct) bool {
 
 	err := xml.Unmarshal([]byte(XMLAttach), &xmlRespon)
 	if err != nil {
-		logger(4, "Could not add Attachment File Data for ["+fileRecord.SmCallRef+"]: "+fmt.Sprintf("%v", err), false)
+		logger(4, "Could not add Attachment File Data for ["+useFileName+"] ["+fileRecord.SmCallRef+"]: "+fmt.Sprintf("%v", err), false)
 		logger(1, "File Data Record XML "+fmt.Sprintf("%s", XMLSTRINGDATA), false)
 	} else {
 		if xmlRespon.MethodResult != "ok" {
-			logger(4, "Could not add Attachment File Data for ["+fileRecord.SmCallRef+"]: "+xmlRespon.State.ErrorRet, false)
+			logger(4, "Could not add Attachment File Data for ["+useFileName+"] ["+fileRecord.SmCallRef+"]: "+xmlRespon.State.ErrorRet, false)
 			logger(1, "File Data Record XML "+fmt.Sprintf("%s", XMLSTRINGDATA), false)
 		} else {
 			//-- If we've got a Content Location back from the API, update the file record with this
@@ -869,7 +875,7 @@ func addFileContent(entityName string, fileRecord fileAssocStruct) bool {
 					} else {
 						espXmlmc.SetParam("h_description", "Originally added by "+fileRecord.AddedBy)
 					}
-					espXmlmc.SetParam("h_filename", fileRecord.FileName)
+					espXmlmc.SetParam("h_filename", useFileName)
 					espXmlmc.SetParam("h_contentlocation", xmlRespon.ContentLocation)
 					espXmlmc.SetParam("h_timestamp", fileRecord.TimeAdded)
 					espXmlmc.SetParam("h_visibility", "trustedGuest")
@@ -881,7 +887,7 @@ func addFileContent(entityName string, fileRecord fileAssocStruct) bool {
 				XMLSTRINGDATA = espXmlmc.GetParam()
 				XMLContentLoc, xmlmcErrContent := espXmlmc.Invoke(strService, strMethod)
 				if xmlmcErrContent != nil {
-					logger(4, "Could not update request ["+fileRecord.SmCallRef+"] with attachment: "+fmt.Sprintf("%v", xmlmcErrContent), false)
+					logger(4, "Could not update request ["+fileRecord.SmCallRef+"] with attachment ["+useFileName+"]: "+fmt.Sprintf("%v", xmlmcErrContent), false)
 					logger(1, "File Data Record XML "+fmt.Sprintf("%s", XMLSTRINGDATA), false)
 					return false
 				}
@@ -889,16 +895,16 @@ func addFileContent(entityName string, fileRecord fileAssocStruct) bool {
 
 				err := xml.Unmarshal([]byte(XMLContentLoc), &xmlResponLoc)
 				if err != nil {
-					logger(4, "Added file data to but unable to set Content Location on ["+fileRecord.SmCallRef+"] for File Content - read response from Hornbill instance:"+fmt.Sprintf("%v", err), false)
+					logger(4, "Added file data to but unable to set Content Location on ["+fileRecord.SmCallRef+"] for File Content ["+useFileName+"] - read response from Hornbill instance:"+fmt.Sprintf("%v", err), false)
 					logger(1, "File Data Record XML "+fmt.Sprintf("%s", XMLSTRINGDATA), false)
 					return false
 				}
 				if xmlResponLoc.MethodResult != "ok" {
-					logger(4, "Added file data but unable to set Content Location on ["+fileRecord.SmCallRef+"] for File Content: "+xmlResponLoc.State.ErrorRet, false)
+					logger(4, "Added file data but unable to set Content Location on ["+fileRecord.SmCallRef+"] for File Content ["+useFileName+"]: "+xmlResponLoc.State.ErrorRet, false)
 					logger(1, "File Data Record XML "+fmt.Sprintf("%s", XMLSTRINGDATA), false)
 					return false
 				}
-				logger(1, "File Content Added to ["+fileRecord.SmCallRef+"] Successfully", false)
+				logger(1, entityName+" File Content ["+useFileName+"] Added to ["+fileRecord.SmCallRef+"] Successfully", false)
 			}
 		}
 	}
@@ -1938,14 +1944,12 @@ func getCallCategoryID(callMap map[string]interface{}, categoryGroup string) (st
 		categoryCode = getFieldValue(categoryNameMapping, callMap)
 		if swImportConf.CategoryMapping[categoryCode] != nil {
 			//Get Category Code from JSON mapping
-			if swImportConf.CategoryMapping[categoryCode] != nil {
-				categoryCode = fmt.Sprintf("%s", swImportConf.CategoryMapping[categoryCode])
-			} else {
-				//Mapping doesn't exist - replace hyphens from SW Profile code with another string, and try to use this
-				//SMProfileCodeSeperator allows us to specify in the config, the seperator used within Service Manager
-				//profile codes
-				categoryCode = strings.Replace(categoryCode, swImportConf.SMProfileCodeSeperator, "-", -1)
-			}
+			categoryCode = fmt.Sprintf("%s", swImportConf.CategoryMapping[categoryCode])
+		} else {
+			//Mapping doesn't exist - replace hyphens from SW Profile code with another string, and try to use this
+			//SMProfileCodeSeperator allows us to specify in the config, the seperator used within Service Manager
+			//profile codes
+			categoryCode = strings.Replace(categoryCode, "-", swImportConf.SMProfileCodeSeperator, -1)
 		}
 
 	} else {
@@ -1953,14 +1957,11 @@ func getCallCategoryID(callMap map[string]interface{}, categoryGroup string) (st
 		categoryCode = getFieldValue(categoryNameMapping, callMap)
 		if swImportConf.ResolutionCategoryMapping[categoryCode] != nil {
 			//Get Category Code from JSON mapping
-			if swImportConf.ResolutionCategoryMapping[categoryCode] != nil {
-				categoryCode = fmt.Sprintf("%s", swImportConf.ResolutionCategoryMapping[categoryCode])
-			} else {
-				//Mapping doesn't exist - replace hyphens from SW Profile code with colon, and try to use this
-				categoryCode = strings.Replace(categoryCode, ":", "-", -1)
-			}
+			categoryCode = fmt.Sprintf("%s", swImportConf.ResolutionCategoryMapping[categoryCode])
+		} else {
+			//Mapping doesn't exist - replace hyphens from SW Profile code with colon, and try to use this
+			categoryCode = strings.Replace(categoryCode, "-", swImportConf.SMProfileCodeSeperator, -1)
 		}
-
 	}
 	if categoryCode != "" {
 		categoryID, categoryString = getCategoryID(categoryCode, categoryGroup)
@@ -1970,6 +1971,7 @@ func getCallCategoryID(callMap map[string]interface{}, categoryGroup string) (st
 
 //getCategoryID takes a Category Code string and returns a correct Category ID if one exists in the cache or on the Instance
 func getCategoryID(categoryCode, categoryGroup string) (string, string) {
+
 	categoryID := ""
 	categoryString := ""
 	if categoryCode != "" {
@@ -1984,6 +1986,7 @@ func getCategoryID(categoryCode, categoryGroup string) (string, string) {
 			if categoryIsOnInstance {
 				categoryID = CategoryIDInstance
 				categoryString = CategoryStringInstance
+			} else {
 			}
 		}
 	}
@@ -2171,7 +2174,8 @@ func categoryInCache(recordName, recordType string) (bool, string, string) {
 		for _, category := range categories {
 			if category.CategoryCode == recordName {
 				boolReturn = true
-				strReturn = category.CategoryID
+				idReturn = category.CategoryID
+				strReturn = category.CategoryName
 			}
 		}
 		mutexCategories.Unlock()
@@ -2419,21 +2423,23 @@ func searchCategory(categoryCode, categoryGroup string) (bool, string, string) {
 	//-- ESP Query for category
 	espXmlmc.SetParam("codeGroup", categoryGroup)
 	espXmlmc.SetParam("code", categoryCode)
-
+	var XMLSTRING = espXmlmc.GetParam()
 	XMLCategorySearch, xmlmcErr := espXmlmc.Invoke("data", "profileCodeLookup")
 	if xmlmcErr != nil {
-		logger(4, "Unable to Search for "+categoryGroup+" Category: "+fmt.Sprintf("%v", xmlmcErr), false)
-		//log.Fatal(xmlmcErr)
+		logger(4, "XMLMC API Invoke Failed for "+categoryGroup+" Category ["+categoryCode+"]: "+fmt.Sprintf("%v", xmlmcErr), false)
+		logger(1, "Category Search XML "+fmt.Sprintf("%s", XMLSTRING), false)
 		return boolReturn, idReturn, strReturn
 	}
 	var xmlRespon xmlmcCategoryListResponse
 
 	err = xml.Unmarshal([]byte(XMLCategorySearch), &xmlRespon)
 	if err != nil {
-		logger(4, "Unable to Search for "+categoryGroup+" Category: "+fmt.Sprintf("%v", err), false)
+		logger(4, "Unable to unmarshal response for "+categoryGroup+" Category: "+fmt.Sprintf("%v", err), false)
+		logger(1, "Category Search XML "+fmt.Sprintf("%s", XMLSTRING), false)
 	} else {
 		if xmlRespon.MethodResult != "ok" {
-			logger(4, "Unable to Search for "+categoryGroup+" Category: "+xmlRespon.State.ErrorRet, false)
+			logger(4, "Unable to Search for "+categoryGroup+" Category ["+categoryCode+"]: "+xmlRespon.State.ErrorRet, false)
+			logger(1, "Category Search XML "+fmt.Sprintf("%s", XMLSTRING), false)
 		} else {
 			//-- Check Response
 			if xmlRespon.CategoryName != "" {
