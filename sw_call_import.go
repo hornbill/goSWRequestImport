@@ -37,53 +37,54 @@ const (
 )
 
 var (
-	appDBDriver          string
-	cacheDBDriver        string
-	arrCallsLogged       = make(map[string]string)
-	arrCallDetailsMaps   = make([]map[string]interface{}, 0)
-	arrSWStatus          = make(map[string]string)
-	boolConfLoaded       bool
-	boolProcessClass     bool
-	configFileName       string
-	configZone           string
-	configDryRun         bool
-	configMaxRoutines    string
-	connStrSysDB         string
-	connStrAppDB         string
-	counters             counterTypeStruct
-	mapGenericConf       swCallConfStruct
-	analysts             []analystListStruct
-	categories           []categoryListStruct
-	closeCategories      []categoryListStruct
-	customers            []customerListStruct
-	priorities           []priorityListStruct
-	services             []serviceListStruct
-	sites                []siteListStruct
-	teams                []teamListStruct
-	importFiles          []fileAssocStruct
-	sqlCallQuery         string
-	swImportConf         swImportConfStruct
-	timeNow              string
-	startTime            time.Time
-	endTime              time.Duration
-	espXmlmc             *apiLib.XmlmcInstStruct
-	xmlmcInstanceConfig  xmlmcConfigStruct
-	mutex                = &sync.Mutex{}
-	mutexAnalysts        = &sync.Mutex{}
-	mutexArrCallsLogged  = &sync.Mutex{}
-	mutexBar             = &sync.Mutex{}
-	mutexCategories      = &sync.Mutex{}
-	mutexCloseCategories = &sync.Mutex{}
-	mutexCustomers       = &sync.Mutex{}
-	mutexPriorities      = &sync.Mutex{}
-	mutexServices        = &sync.Mutex{}
-	mutexSites           = &sync.Mutex{}
-	mutexTeams           = &sync.Mutex{}
-	wgRequest            sync.WaitGroup
-	wgAssoc              sync.WaitGroup
-	wgFile               sync.WaitGroup
-	reqPrefix            string
-	maxGoroutines        = 1
+	appDBDriver            string
+	cacheDBDriver          string
+	arrCallsLogged         = make(map[string]string)
+	arrCallDetailsMaps     = make([]map[string]interface{}, 0)
+	arrSWStatus            = make(map[string]string)
+	boolConfLoaded         bool
+	boolProcessClass       bool
+	configFileName         string
+	configZone             string
+	configDryRun           bool
+	configMaxRoutines      string
+	connStrSysDB           string
+	connStrAppDB           string
+	counters               counterTypeStruct
+	mapGenericConf         swCallConfStruct
+	analysts               []analystListStruct
+	categories             []categoryListStruct
+	closeCategories        []categoryListStruct
+	customers              []customerListStruct
+	priorities             []priorityListStruct
+	services               []serviceListStruct
+	sites                  []siteListStruct
+	teams                  []teamListStruct
+	importFiles            []fileAssocStruct
+	sqlCallQuery           string
+	swImportConf           swImportConfStruct
+	timeNow                string
+	startTime              time.Time
+	endTime                time.Duration
+	espXmlmc               *apiLib.XmlmcInstStruct
+	xmlmcInstanceConfig    xmlmcConfigStruct
+	mutex                  = &sync.Mutex{}
+	mutexAnalysts          = &sync.Mutex{}
+	mutexArrCallsLogged    = &sync.Mutex{}
+	mutexBar               = &sync.Mutex{}
+	mutexCategories        = &sync.Mutex{}
+	mutexCloseCategories   = &sync.Mutex{}
+	mutexCustomers         = &sync.Mutex{}
+	mutexPriorities        = &sync.Mutex{}
+	mutexServices          = &sync.Mutex{}
+	mutexSites             = &sync.Mutex{}
+	mutexTeams             = &sync.Mutex{}
+	wgRequest              sync.WaitGroup
+	wgAssoc                sync.WaitGroup
+	wgFile                 sync.WaitGroup
+	reqPrefix              string
+	maxGoroutines          = 1
+	boolProcessAttachments bool
 )
 
 // ----- Structures -----
@@ -360,6 +361,7 @@ func main() {
 	flag.StringVar(&configZone, "zone", "eur", "Override the default Zone the instance sits in")
 	flag.BoolVar(&configDryRun, "dryrun", false, "Dump import XML to log instead of creating requests")
 	flag.StringVar(&configMaxRoutines, "concurrent", "1", "Maximum number of requests to import concurrently.")
+	flag.BoolVar(&boolProcessAttachments, "attachments", false, "Import attachemnts without prompting.")
 	flag.Parse()
 
 	//-- Output to CLI and Log
@@ -601,14 +603,16 @@ func processFileAttachments() {
 	logger(6, " amount of "+strStorageTotal+".", true)
 	fmt.Printf(" Do you want to import your Supportworks Call File Attachments\n in to your Service Manager Requests (yes/no): ")
 
-	boolProcessAttachments := false
-	if confirmResponse() == false {
-		color.Red(" If you do not import file attachments at this stage, you will NOT\n be able to import them in the future!")
-		color.Red("\n Please confirm your response one more time.")
-		fmt.Printf("\n Do you want to import your Supportworks Call File Attachments\n in to your Service Manager Requests (yes/no): ")
-		boolProcessAttachments = confirmResponse()
-	} else {
-		boolProcessAttachments = true
+	//check if we want to process attachments from command line flag otherwise ask
+	if boolProcessAttachments == false {
+		if confirmResponse() == false {
+			color.Red(" If you do not import file attachments at this stage, you will NOT\n be able to import them in the future!")
+			color.Red("\n Please confirm your response one more time.")
+			fmt.Printf("\n Do you want to import your Supportworks Call File Attachments\n in to your Service Manager Requests (yes/no): ")
+			boolProcessAttachments = confirmResponse()
+		} else {
+			boolProcessAttachments = true
+		}
 	}
 	if boolProcessAttachments == true {
 		//Iterate through File Attachment records again for processing
@@ -751,7 +755,7 @@ func addFileContent(entityName string, fileRecord fileAssocStruct) bool {
 	fileExtension := filepath.Ext(fileRecord.FileName)
 	swmDecoded := ""
 	subjectLine := ""
-	useFileName := fileRecord.FileName;
+	useFileName := fileRecord.FileName
 	if fileExtension == ".swm" {
 		//Further processing for SWM files
 		//Copy content in to TXT file, and attach this instead
@@ -808,8 +812,6 @@ func addFileContent(entityName string, fileRecord fileAssocStruct) bool {
 		}
 		logger(1, "Historic Update File Attactment Record Insertion Success ["+useFileName+"] ["+fileRecord.SmCallRef+"]", false)
 	}
-
-
 
 	espXmlmc, sessErr2 := NewEspXmlmcSession()
 	if sessErr2 != nil {
