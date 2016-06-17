@@ -546,7 +546,7 @@ Command Line Parameters
 * dryrun - Defaults to `false` - Set to True and the XMLMC for new request creation will not be called and instead the XML will be dumped to the log file, this is to aid in debugging the initial connection information.
 * zone - Defaults to `eur` - Allows you to change the ZONE used for creating the XMLMC EndPoint URL https://{ZONE}api.hornbill.com/{INSTANCE}/
 * concurrent - defaults to `1`. This is to specify the number of requests that should be imported concurrently, and can be an integer between 1 and 10 (inclusive). 1 is the slowest level of import, but does not affect performance of your Hornbill instance, and 10 will process the import much more quickly but could affect performance.
-* attachments - defaults to boolean `false` this is to prevent being asked if you wish to import the attachments and. set like -attachments=true to continue with out being prompted
+* attachments - defaults to 'false'. If this is false then the tool will prompt to import file attachments, giving you detailed informtion regarding instance free-space and the approximate amount of space the imported files will take up. Set to true and the tool will import the files without prompting.
 
 # Testing
 If you run the application with the argument dryrun=true then no requests will be logged - the XML used to raise requests will instead be saved in to the log file so you can ensure the data mappings are correct before running the import.

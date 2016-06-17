@@ -1469,6 +1469,28 @@ func logNewCall(callClass string, callMap map[string]interface{}, swCallID strin
 			counters.Unlock()
 			boolCallLoggedOK = true
 
+			//Now update the request to create the activity stream
+			espXmlmc.SetParam("socialObjectRef", "urn:sys:entity:"+appServiceManager+":Requests:"+strNewCallRef)
+			espXmlmc.SetParam("content", "Request imported from Supportworks")
+			espXmlmc.SetParam("visibility", "public")
+			espXmlmc.SetParam("type", "Logged")
+			fixed, err := espXmlmc.Invoke("activity", "postMessage")
+			if err != nil {
+				logger(5, "Activity Stream Creation failed for Request: "+strNewCallRef, false)
+			} else {
+				var xmlRespon xmlmcResponse
+				err = xml.Unmarshal([]byte(fixed), &xmlRespon)
+				if err != nil {
+					logger(5, "Activity Stream Creation unmarshall failed for Request "+strNewCallRef, false)
+				} else {
+					if xmlRespon.MethodResult != "ok" {
+						logger(5, "Activity Stream Creation was unsuccessful for ["+strNewCallRef+"]: "+xmlRespon.MethodResult, false)
+					} else {
+						logger(1, "Activity Stream Creation successful for ["+strNewCallRef+"]", false)
+					}
+				}
+			}
+
 			//Now update Logdate
 			if boolUpdateLogDate {
 				espXmlmc.SetParam("application", appServiceManager)
@@ -1989,6 +2011,7 @@ func getCategoryID(categoryCode, categoryGroup string) (string, string) {
 				categoryID = CategoryIDInstance
 				categoryString = CategoryStringInstance
 			} else {
+				logger(4, "[CATEGORY] "+categoryGroup+" Category ["+categoryCode+"]is not on instance.", false)
 			}
 		}
 	}
@@ -2447,6 +2470,7 @@ func searchCategory(categoryCode, categoryGroup string) (bool, string, string) {
 			if xmlRespon.CategoryName != "" {
 				strReturn = xmlRespon.CategoryName
 				idReturn = xmlRespon.CategoryID
+				logger(3, " [CATEGORY] [SUCCESS] Methodcall result OK for "+categoryGroup+" Category ["+categoryCode+"] but category name blank.", false)
 				boolReturn = true
 				//-- Add Category to Cache
 				var newCategoryForCache categoryListStruct
@@ -2464,6 +2488,9 @@ func searchCategory(categoryCode, categoryGroup string) (bool, string, string) {
 					closeCategories = append(closeCategories, categoryNamedMap...)
 					mutexCloseCategories.Unlock()
 				}
+			} else {
+				logger(3, " [CATEGORY] [FAIL] Methodcall result OK for "+categoryGroup+" Category ["+categoryCode+"] but category name blank: ["+xmlRespon.CategoryID+"] ["+xmlRespon.CategoryName+"]", false)
+				logger(3, "[CATEGORY] [FAIL] Category Search XML "+fmt.Sprintf("%s", XMLSTRING), false)
 			}
 		}
 	}
