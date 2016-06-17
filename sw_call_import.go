@@ -601,10 +601,10 @@ func processFileAttachments() {
 	logger(6, " Request File Attachments.", true)
 	logger(6, " You have approximately "+strStorageAvailable+" available space, from your subscribed", true)
 	logger(6, " amount of "+strStorageTotal+".", true)
-	fmt.Printf(" Do you want to import your Supportworks Call File Attachments\n in to your Service Manager Requests (yes/no): ")
 
 	//check if we want to process attachments from command line flag otherwise ask
 	if boolProcessAttachments == false {
+		fmt.Printf(" Do you want to import your Supportworks Call File Attachments\n in to your Service Manager Requests (yes/no): ")
 		if confirmResponse() == false {
 			color.Red(" If you do not import file attachments at this stage, you will NOT\n be able to import them in the future!")
 			color.Red("\n Please confirm your response one more time.")
