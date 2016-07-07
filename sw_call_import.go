@@ -26,7 +26,7 @@ import (
 )
 
 const (
-	version           = "1.2.6"
+	version           = "1.2.7"
 	appServiceManager = "com.hornbill.servicemanager"
 	//Disk Space Declarations
 	sizeKB float64 = 1 << (10 * 1)
@@ -766,6 +766,9 @@ func addFileContent(entityName string, fileRecord fileAssocStruct) bool {
 		useFileName = useFileName + ".txt"
 	}
 
+	filenameReplacer := strings.NewReplacer("<", "_", ">", "_", "|", "_", "\\", "_", "/", "_", ":", "_", "*", "_", "?", "_", "\"", "_")
+	useFileName = fmt.Sprintf("%s", filenameReplacer.Replace(useFileName))
+
 	if entityName == "RequestHistoricUpdateAttachments" {
 		espXmlmc, sessErr := NewEspXmlmcSession()
 		if sessErr != nil {
@@ -1012,7 +1015,7 @@ func processCallAssociations() {
 
 	//build query
 	sqlDiaryQuery := "SELECT fk_callref_m, fk_callref_s from cmn_rel_opencall_oc "
-	logger(3, "[DATABASE} Request Association Query: "+sqlDiaryQuery, false)
+	logger(3, "[DATABASE] Request Association Query: "+sqlDiaryQuery, false)
 	//Run Query
 	rows, err := db.Queryx(sqlDiaryQuery)
 	if err != nil {
@@ -2011,7 +2014,7 @@ func getCategoryID(categoryCode, categoryGroup string) (string, string) {
 				categoryID = CategoryIDInstance
 				categoryString = CategoryStringInstance
 			} else {
-				logger(4, "[CATEGORY] "+categoryGroup+" Category ["+categoryCode+"]is not on instance.", false)
+				logger(4, "[CATEGORY] "+categoryGroup+" Category ["+categoryCode+"] is not on instance.", false)
 			}
 		}
 	}
@@ -2463,14 +2466,14 @@ func searchCategory(categoryCode, categoryGroup string) (bool, string, string) {
 		logger(1, "Category Search XML "+fmt.Sprintf("%s", XMLSTRING), false)
 	} else {
 		if xmlRespon.MethodResult != "ok" {
-			logger(4, "Unable to Search for "+categoryGroup+" Category ["+categoryCode+"]: "+xmlRespon.State.ErrorRet, false)
+			logger(4, "Unable to Search for "+categoryGroup+" Category ["+categoryCode+"]: ["+fmt.Sprintf("%v", xmlRespon.MethodResult)+"] "+xmlRespon.State.ErrorRet, false)
 			logger(1, "Category Search XML "+fmt.Sprintf("%s", XMLSTRING), false)
 		} else {
 			//-- Check Response
 			if xmlRespon.CategoryName != "" {
 				strReturn = xmlRespon.CategoryName
 				idReturn = xmlRespon.CategoryID
-				logger(3, " [CATEGORY] [SUCCESS] Methodcall result OK for "+categoryGroup+" Category ["+categoryCode+"] but category name blank.", false)
+				logger(3, "[CATEGORY] [SUCCESS] Methodcall result OK for "+categoryGroup+" Category ["+categoryCode+"] : ["+strReturn+"]", false)
 				boolReturn = true
 				//-- Add Category to Cache
 				var newCategoryForCache categoryListStruct
@@ -2489,7 +2492,7 @@ func searchCategory(categoryCode, categoryGroup string) (bool, string, string) {
 					mutexCloseCategories.Unlock()
 				}
 			} else {
-				logger(3, " [CATEGORY] [FAIL] Methodcall result OK for "+categoryGroup+" Category ["+categoryCode+"] but category name blank: ["+xmlRespon.CategoryID+"] ["+xmlRespon.CategoryName+"]", false)
+				logger(3, "[CATEGORY] [FAIL] Methodcall result OK for "+categoryGroup+" Category ["+categoryCode+"] but category name blank: ["+xmlRespon.CategoryID+"] ["+xmlRespon.CategoryName+"]", false)
 				logger(3, "[CATEGORY] [FAIL] Category Search XML "+fmt.Sprintf("%s", XMLSTRING), false)
 			}
 		}

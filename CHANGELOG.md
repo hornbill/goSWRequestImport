@@ -1,3 +1,8 @@
+## 1.2.7 (July 7th, 2016)
+
+Defect Fix:
+- File attachments with names containing API-constrained characters [<>|\/:*?"] were not imported. These characters are now replaced by an underscore character _
+
 ## 1.2.6 (June 17th, 2016)
 
 Feature:
