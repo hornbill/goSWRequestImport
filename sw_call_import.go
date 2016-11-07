@@ -26,7 +26,7 @@ import (
 )
 
 const (
-	version           = "1.2.7"
+	version           = "1.2.8"
 	appServiceManager = "com.hornbill.servicemanager"
 	//Disk Space Declarations
 	sizeKB float64 = 1 << (10 * 1)
@@ -305,6 +305,7 @@ type xmlmcAttachmentResponse struct {
 type xmlmcEmailAttachmentResponse struct {
 	MethodResult string            `xml:"status,attr"`
 	Recipients   []recipientStruct `xml:"params>recipient"`
+	Attachments	 []swmAttachmentStruct `xml:"params>fileAttachment"`
 	Subject      string            `xml:"params>subject"`
 	Body         string            `xml:"params>body"`
 	HTMLBody     string            `xml:"params>htmlBody"`
@@ -316,7 +317,19 @@ type recipientStruct struct {
 	Address string `xml:"address"`
 	Name    string `xml:"name"`
 }
-
+type swmAttachmentStruct struct {
+	FileName  string `xml:"fileName"`
+	FileData 	string `xml:"fileData"`
+	FileSize  string `xml:"fileSize"`
+	TimeStamp	string `xml:"timeStamp"`
+	ContentType	string `xml:"contentType"`
+	ContentID	string	`xml:"contentId"`
+}
+type xmlmcSwmAttachResponseStruct struct {
+	MethodResult string      `xml:"status,attr"`
+	AttachmentID    string   `xml:"params>primaryEntityData>record>h_pk_fileid "`
+	State        stateStruct `xml:"state"`
+}
 //----- File Attachment Struct
 type fileAssocStruct struct {
 	ImportRef  int
@@ -641,7 +654,7 @@ func processFileAttachments() {
 				bar.Increment()
 				mutexBar.Unlock()
 
-				addFileContent(entityRequest, objFileRecord)
+				processFileContent(entityRequest, objFileRecord)
 
 				<-maxGoroutinesGuard
 			}()
@@ -656,35 +669,39 @@ func processFileAttachments() {
 }
 
 //decodeSWMFile - reads the email attachment from Supportworks, returns the content as a string
-func decodeSWMFile(fileEncoded string) (string, string) {
+func decodeSWMFile(fileEncoded string) (string, string, []swmAttachmentStruct) {
 	emailContent := ""
 	subjectLine := ""
+	var fileAttachments []swmAttachmentStruct
 	//Decode SWM in to struct
 	espXmlmc, err := NewEspXmlmcSession()
 	if err != nil {
 		logger(4, "Unable to attach to XMLMC session to decode SWM.", true)
-		return emailContent, subjectLine
+		return emailContent, subjectLine, fileAttachments
 	}
 	espXmlmc.SetParam("fileContent", fileEncoded)
 	XMLEmailDecoded, xmlmcErrEmail := espXmlmc.Invoke("mail", "decodeCompositeMessage")
 	if xmlmcErrEmail != nil {
 		logger(5, "API Error response from decodeCompositeMessage: "+fmt.Sprintf("%v", xmlmcErrEmail), false)
-		return emailContent, subjectLine
+		return emailContent, subjectLine, fileAttachments
 	}
 	var xmlResponEmail xmlmcEmailAttachmentResponse
 	errUnmarshall := xml.Unmarshal([]byte(XMLEmailDecoded), &xmlResponEmail)
 	if errUnmarshall != nil {
 		logger(5, "Unable to read XML response from Message Decode: "+fmt.Sprintf("%v", errUnmarshall), false)
-		return emailContent, subjectLine
+		return emailContent, subjectLine, fileAttachments
 	}
 	if xmlResponEmail.MethodResult != "ok" {
 		logger(5, "Error returned from API for Message Decode: "+fmt.Sprintf("%v", xmlResponEmail.MethodResult), false)
-		return emailContent, subjectLine
+		return emailContent, subjectLine, fileAttachments
 	}
 
 	if xmlResponEmail.Recipients == nil {
 		logger(5, "No recipients found in mail message.", false)
-		return emailContent, subjectLine
+		return emailContent, subjectLine, fileAttachments
+	}
+	if xmlResponEmail.Attachments != nil {
+		fileAttachments = xmlResponEmail.Attachments
 	}
 
 	//Build string to write to text file
@@ -713,11 +730,61 @@ func decodeSWMFile(fileEncoded string) (string, string) {
 	emailContent = emailContent + subjectLine + "\r\n"
 	emailContent = emailContent + strings.Repeat("-", len(subjectLine)) + "\r\n"
 	emailContent = emailContent + bodyText
-	return emailContent, subjectLine
+	return emailContent, subjectLine, fileAttachments
 }
 
-//addFileContent - reads the file attachment from Supportworks, attach to request and update content location
-func addFileContent(entityName string, fileRecord fileAssocStruct) bool {
+//addHistoricAttachmentRecord
+func addHistoricAttachmentRecord(useFileName string, fileRecord fileAssocStruct) string {
+	espXmlmc, sessErr := NewEspXmlmcSession()
+	if sessErr != nil {
+		logger(4, "Unable to attach to XMLMC session to add file record.", true)
+		return ""
+	}
+	espXmlmc.SetParam("application", appServiceManager)
+	espXmlmc.SetParam("entity", "RequestHistoricUpdateAttachments")
+	espXmlmc.OpenElement("primaryEntityData")
+	espXmlmc.OpenElement("record")
+	espXmlmc.SetParam("h_addedby", fileRecord.AddedBy)
+	espXmlmc.SetParam("h_callref", fileRecord.SmCallRef)
+	espXmlmc.SetParam("h_compressed", fileRecord.Compressed)
+	espXmlmc.SetParam("h_dataid", fileRecord.DataID)
+	espXmlmc.SetParam("h_filename", useFileName)
+	espXmlmc.SetParam("h_filetime", fileRecord.FileTime)
+	espXmlmc.SetParam("h_pk_fileid", fileRecord.FileID)
+	espXmlmc.SetParam("h_sizec", strconv.Itoa(int(fileRecord.SizeC)))
+	espXmlmc.SetParam("h_sizeu", strconv.Itoa(int(fileRecord.SizeU)))
+	espXmlmc.SetParam("h_timeadded", fileRecord.TimeAdded)
+	espXmlmc.SetParam("h_updateid", fileRecord.UpdateID)
+	espXmlmc.CloseElement("record")
+	espXmlmc.CloseElement("primaryEntityData")
+
+	var XMLSTRING = espXmlmc.GetParam()
+
+	XMLHistAtt, xmlmcErr := espXmlmc.Invoke("data", "entityAddRecord")
+	if xmlmcErr != nil {
+		logger(4, "RequestHistoricUpdateAttachments entityAddRecord Failed "+fmt.Sprintf("%s", xmlmcErr), false)
+		logger(1, "RequestHistoricUpdateAttachments entityAddRecord Failed File Attachment Record XML "+fmt.Sprintf("%s", XMLSTRING), false)
+		return ""
+	}
+	var xmlRespon xmlmcSwmAttachResponseStruct
+	errXMLMC := xml.Unmarshal([]byte(XMLHistAtt), &xmlRespon)
+	if errXMLMC != nil {
+		logger(4, "Unable to read response from Hornbill instance for Update File Attachment Record Insertion ["+useFileName+"] ["+fileRecord.SmCallRef+"]:"+fmt.Sprintf("%v", errXMLMC), false)
+		logger(1, "File Attachment Record XML "+fmt.Sprintf("%s", XMLSTRING), false)
+		return ""
+	}
+	if xmlRespon.MethodResult != "ok" {
+		logger(4, "Unable to process Update File Attachment Record Insertion ["+useFileName+"] ["+fileRecord.SmCallRef+"]: "+xmlRespon.State.ErrorRet, false)
+		logger(1, "File Attachment Record XML "+fmt.Sprintf("%s", XMLSTRING), false)
+		return ""
+	}
+	logger(1, "Historic Update File Attactment Record Insertion Success [AttachPK:"+xmlRespon.AttachmentID+"]["+useFileName+"] ["+fileRecord.SmCallRef+"]", false)
+	fmt.Println(xmlRespon)
+	return xmlRespon.AttachmentID
+}
+
+//processFileContent - reads the file attachment from Supportworks, attach to request and update content location
+func processFileContent(entityName string, fileRecord fileAssocStruct) bool {
 
 	subFolderName := getSubFolderName(fileRecord.CallRef)
 	hostFileName := padCallRef(fileRecord.CallRef, "f", 8) + "." + padCallRef(fileRecord.DataID, "", 3)
@@ -756,64 +823,30 @@ func addFileContent(entityName string, fileRecord fileAssocStruct) bool {
 	swmDecoded := ""
 	subjectLine := ""
 	useFileName := fileRecord.FileName
+	var swmAttachments []swmAttachmentStruct
 	if fileExtension == ".swm" {
 		//Further processing for SWM files
 		//Copy content in to TXT file, and attach this instead
-		swmDecoded, subjectLine = decodeSWMFile(fileEncoded)
+		swmDecoded, subjectLine, swmAttachments = decodeSWMFile(fileEncoded)
+
 		if swmDecoded != "" {
 			fileEncoded = base64.StdEncoding.EncodeToString([]byte(swmDecoded))
 		}
 		useFileName = useFileName + ".txt"
 	}
 
+	for _, attachment := range swmAttachments {
+		fmt.Println("Filename:", attachment.FileName)
+		fmt.Println("FileSize:", attachment.FileSize)
+		fmt.Println("TimeStamp:", attachment.TimeStamp)
+	}
+
 	filenameReplacer := strings.NewReplacer("<", "_", ">", "_", "|", "_", "\\", "_", "/", "_", ":", "_", "*", "_", "?", "_", "\"", "_")
 	useFileName = fmt.Sprintf("%s", filenameReplacer.Replace(useFileName))
 
 	if entityName == "RequestHistoricUpdateAttachments" {
-		espXmlmc, sessErr := NewEspXmlmcSession()
-		if sessErr != nil {
-			logger(4, "Unable to attach to XMLMC session to add file record.", true)
-			return false
-		}
-		espXmlmc.SetParam("application", appServiceManager)
-		espXmlmc.SetParam("entity", "RequestHistoricUpdateAttachments")
-		espXmlmc.OpenElement("primaryEntityData")
-		espXmlmc.OpenElement("record")
-		espXmlmc.SetParam("h_addedby", fileRecord.AddedBy)
-		espXmlmc.SetParam("h_callref", fileRecord.SmCallRef)
-		espXmlmc.SetParam("h_compressed", fileRecord.Compressed)
-		espXmlmc.SetParam("h_dataid", fileRecord.DataID)
-		espXmlmc.SetParam("h_filename", useFileName)
-		espXmlmc.SetParam("h_filetime", fileRecord.FileTime)
-		espXmlmc.SetParam("h_pk_fileid", fileRecord.FileID)
-		espXmlmc.SetParam("h_sizec", strconv.Itoa(int(fileRecord.SizeC)))
-		espXmlmc.SetParam("h_sizeu", strconv.Itoa(int(fileRecord.SizeU)))
-		espXmlmc.SetParam("h_timeadded", fileRecord.TimeAdded)
-		espXmlmc.SetParam("h_updateid", fileRecord.UpdateID)
-		espXmlmc.CloseElement("record")
-		espXmlmc.CloseElement("primaryEntityData")
-
-		var XMLSTRING = espXmlmc.GetParam()
-
-		XMLHistAtt, xmlmcErr := espXmlmc.Invoke("data", "entityAddRecord")
-		if xmlmcErr != nil {
-			logger(1, "RequestHistoricUpdateAttachments entityAddRecord Failed "+fmt.Sprintf("%s", xmlmcErr), false)
-			logger(1, "RequestHistoricUpdateAttachments entityAddRecord Failed File Attachment Record XML "+fmt.Sprintf("%s", XMLSTRING), false)
-			return false
-		}
-		var xmlRespon xmlmcResponse
-		errXMLMC := xml.Unmarshal([]byte(XMLHistAtt), &xmlRespon)
-		if errXMLMC != nil {
-			logger(4, "Unable to read response from Hornbill instance for Update File Attachment Record Insertion ["+useFileName+"] ["+fileRecord.SmCallRef+"]:"+fmt.Sprintf("%v", errXMLMC), false)
-			logger(1, "File Attachment Record XML "+fmt.Sprintf("%s", XMLSTRING), false)
-			return false
-		}
-		if xmlRespon.MethodResult != "ok" {
-			logger(4, "Unable to process Update File Attachment Record Insertion ["+useFileName+"] ["+fileRecord.SmCallRef+"]: "+xmlRespon.State.ErrorRet, false)
-			logger(1, "File Attachment Record XML "+fmt.Sprintf("%s", XMLSTRING), false)
-			return false
-		}
-		logger(1, "Historic Update File Attactment Record Insertion Success ["+useFileName+"] ["+fileRecord.SmCallRef+"]", false)
+		//Add record(s) to RequestHistoricUpdateAttachments
+		attPriKey = addHistoricAttachmentRecord(useFileName, fileRecord)
 	}
 
 	espXmlmc, sessErr2 := NewEspXmlmcSession()
@@ -863,7 +896,7 @@ func addFileContent(entityName string, fileRecord fileAssocStruct) bool {
 					espXmlmc.SetParam("entity", "RequestHistoricUpdateAttachments")
 					espXmlmc.OpenElement("primaryEntityData")
 					espXmlmc.OpenElement("record")
-					espXmlmc.SetParam("h_pk_fileid", fileRecord.FileID)
+					espXmlmc.SetParam("h_pk_fileid", attPriKey)
 					espXmlmc.SetParam("h_contentlocation", xmlRespon.ContentLocation)
 					espXmlmc.CloseElement("record")
 					espXmlmc.CloseElement("primaryEntityData")
@@ -1644,7 +1677,7 @@ func applyHistoricalUpdates(newCallRef, swCallRef string) bool {
 	logger(3, "[DATABASE] Running query for Historical Updates of call "+swCallRef+". Please wait...", false)
 	//build query
 	sqlDiaryQuery := "SELECT updatetimex, repid, groupid, udsource, udcode, udtype, updatetxt, udindex, timespent "
-	sqlDiaryQuery = sqlDiaryQuery + " FROM updatedb WHERE callref = " + swCallRef + " ORDER BY udindex ASC"
+	sqlDiaryQuery = sqlDiaryQuery + " FROM updatedb WHERE callref = " + swCallRef + " ORDER BY udindex DESC"
 	logger(3, "[DATABASE} Diary Query: "+sqlDiaryQuery, false)
 	mutex.Unlock()
 	//Run Query

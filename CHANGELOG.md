@@ -1,3 +1,8 @@
+## 1.2.8 (November 7th 2016)
+
+Feature:
+- Historical diary entries are now ordered by descending update time
+
 ## 1.2.7 (July 7th, 2016)
 
 Defect Fix:
