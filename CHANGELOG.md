@@ -1,3 +1,8 @@
+## 1.2.9 (November 14th 2016)
+
+Defect Fix:
+- Issue importing file attachments in to historical attachments entity
+
 ## 1.2.8 (November 7th 2016)
 
 Feature:
