@@ -1,3 +1,8 @@
+## 1.2.10 (November 25th 2016)
+
+Defect Fix:
+- Issue importing requests in an On Hold status in to Service Manager v2.30+
+
 ## 1.2.9 (November 14th 2016)
 
 Defect Fix:

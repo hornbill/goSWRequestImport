@@ -26,7 +26,7 @@ import (
 )
 
 const (
-	version           = "1.2.9"
+	version           = "1.2.10"
 	appServiceManager = "com.hornbill.servicemanager"
 	//Disk Space Declarations
 	sizeKB float64 = 1 << (10 * 1)
@@ -1185,6 +1185,7 @@ func logNewCall(callClass string, callMap map[string]interface{}, swCallID strin
 	strNewCallRef := ""
 
 	strStatus := ""
+	boolOnHoldRequest := false
 	statusMapping := fmt.Sprintf("%v", mapGenericConf.CoreFieldMapping["h_status"])
 	if statusMapping != "" {
 		if statusMapping == "16" || statusMapping == "18" {
@@ -1324,12 +1325,6 @@ func logNewCall(callClass string, callMap map[string]interface{}, swCallID strin
 			boolAutoProcess = false
 		}
 
-		// Request Status
-		if strAttribute == "h_status" {
-			espXmlmc.SetParam(strAttribute, strStatus)
-			boolAutoProcess = false
-		}
-
 		// Team ID and Name
 		if strAttribute == "h_fk_team_id" {
 			//-- Get Team ID
@@ -1379,6 +1374,16 @@ func logNewCall(callClass string, callMap map[string]interface{}, swCallID strin
 			}
 		}
 
+		// Request Status
+		if strAttribute == "h_status" {
+			if strStatus == "status.onHold" {
+				strStatus = "status.open"
+				boolOnHoldRequest = true
+			}
+			espXmlmc.SetParam(strAttribute, strStatus)
+			boolAutoProcess = false
+		}
+
 		// Log Date/Time - setup ready to be processed after call logged
 		if strAttribute == "h_datelogged" && strMapping != "" {
 			loggedEPOCH := getFieldValue(strMapping, callMap)
@@ -1392,6 +1397,7 @@ func logNewCall(callClass string, callMap map[string]interface{}, swCallID strin
 
 		//Everything Else
 		if boolAutoProcess &&
+			strAttribute != "h_status" &&
 			strAttribute != "h_requesttype" &&
 			strAttribute != "h_request_prefix" &&
 			strAttribute != "h_category" &&
@@ -1582,7 +1588,7 @@ func logNewCall(callClass string, callMap map[string]interface{}, swCallID strin
 			}
 
 			// Now handle calls in an On Hold status
-			if strStatus == "status.onHold" {
+			if boolOnHoldRequest {
 				espXmlmc.SetParam("requestId", strNewCallRef)
 				espXmlmc.SetParam("onHoldUntil", strClosedDate)
 				espXmlmc.SetParam("strReason", "Request imported from Supportworks in an On Hold status. See Historical Request Updates for further information.")
