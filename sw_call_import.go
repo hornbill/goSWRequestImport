@@ -26,7 +26,7 @@ import (
 )
 
 const (
-	version           = "1.2.10"
+	version           = "1.3.0"
 	appServiceManager = "com.hornbill.servicemanager"
 	//Disk Space Declarations
 	sizeKB float64 = 1 << (10 * 1)
@@ -1445,6 +1445,30 @@ func logNewCall(callClass string, callMap map[string]interface{}, swCallID strin
 	espXmlmc.CloseElement("record")
 	espXmlmc.CloseElement("relatedEntityData")
 
+	//Extended Data Insert
+	espXmlmc.OpenElement("relatedEntityData")
+	espXmlmc.SetParam("relationshipName", "Extended Information")
+	espXmlmc.SetParam("entityAction", "insert")
+	espXmlmc.OpenElement("record")
+	espXmlmc.SetParam("h_request_type", callClass)
+	strAttribute = ""
+	strMapping = ""
+	//Loop through AdditionalFieldMapping fields from config, add to XMLMC Params if not empty
+	for k, v := range mapGenericConf.AdditionalFieldMapping {
+		strAttribute = fmt.Sprintf("%v", k)
+		strSubString := "h_custom_"
+		if strings.Contains(strAttribute, strSubString) {
+			strAttribute = convExtendedColName(strAttribute)
+			strMapping = fmt.Sprintf("%v", v)
+			if strMapping != "" && getFieldValue(strMapping, callMap) != "" {
+				espXmlmc.SetParam(strAttribute, getFieldValue(strMapping, callMap))
+			}
+		}
+	}
+
+	espXmlmc.CloseElement("record")
+	espXmlmc.CloseElement("relatedEntityData")
+
 	//-- Check for Dry Run
 	if configDryRun != true {
 
@@ -1626,6 +1650,18 @@ func logNewCall(callClass string, callMap map[string]interface{}, swCallID strin
 	}
 
 	return boolCallLoggedOK, strNewCallRef
+}
+
+//convExtendedColName - takes old extended column name, returns new one (supply h_custom_a returns h_custom_1 for example)
+//Split string in to array with _ as seperator
+//Convert last array entry string character to Rune
+//Convert Rune to Integer
+//Subtract 96 from Integer
+//Convert resulting Integer to String (numeric character), append to prefix and pass back
+func convExtendedColName(oldColName string) string {
+	arrColName := strings.Split(oldColName, "_")
+	strNewColID := strconv.Itoa(int([]rune(arrColName[2])[0]) - 96)
+	return "h_custom_" + strNewColID
 }
 
 //applyHistoricalUpdates - takes call diary records from Supportworks, imports to Hornbill as Historical Updates

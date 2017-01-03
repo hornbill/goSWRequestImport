@@ -1,3 +1,8 @@
+## 1.3.0 (January 3rd 2017)
+
+Feature:
+- Added logic to write AdditionalFieldMapping mapped data to new RequestsExtended entity
+
 ## 1.2.10 (November 25th 2016)
 
 Defect Fix:
