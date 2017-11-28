@@ -1,3 +1,21 @@
+## 1.4.0 (November 28th 2017)
+
+Defect Fix:
+- Fixed mismatch of historic attachment UpdateID to Historic Update Index
+
+Features:
+- Refactored code, broken the code up in the original release in to modules for easier reading and maintenance;
+- Status Mapping, which was hard-coded, is now configurable;
+- Output DB connection errors to CLI as well as Log
+- Optimise hornbillitsmhistoric index once historic updates have been added
+- Made the Request Type in the configuration an array of objects, so can add configuration for as many request type imports as necessary.
+- Added support for import of Releases;
+- Added support for import of BP Task;
+- Added support for admin-defined query to return request associations, and configuration to allow imported BP Tasks to be associaed to other imported request types;
+- Process file attachments in-line when importing requests, rather than at the end of the import process;
+- Supportworks Mail file extraction, and attach files contained in SWM emails as files against new request or historic updates
+- Improved logging
+
 ## 1.3.0 (January 3rd 2017)
 
 Feature:
