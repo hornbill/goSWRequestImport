@@ -87,7 +87,7 @@ func queryDBCallDetails(callClass, swCallClass, connString string) bool {
 		return false
 	}
 	logger(3, "[DATABASE] Connection Successful", true)
-	logger(3, "[DATABASE] Running query for calls of class "+callClass+", "+swCallClass+" from Supportworks.", true)
+	logger(3, "[DATABASE] Retrieving "+callClass+"s, "+swCallClass+" from Supportworks.", true)
 	logger(3, "[DATABASE] Please Wait...", true)
 	//build query
 	sqlCallQuery = mapGenericConf.SQLStatement
