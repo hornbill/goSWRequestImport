@@ -378,8 +378,6 @@ func logNewCall(callClass string, callMap map[string]interface{}, swCallID strin
 			counters.Unlock()
 			boolCallLoggedOK = true
 
-			//Add file attachments to request
-			processFileAttachments(swCallID, strNewCallRef)
 
 			//Now update the request to create the activity stream
 			espXmlmc.SetParam("socialObjectRef", "urn:sys:entity:"+appServiceManager+":Requests:"+strNewCallRef)
@@ -405,6 +403,7 @@ func logNewCall(callClass string, callMap map[string]interface{}, swCallID strin
 
 			//Now update Logdate
 			if boolUpdateLogDate {
+				espXmlmc.ClearParam()
 				espXmlmc.SetParam("application", appServiceManager)
 				espXmlmc.SetParam("entity", "Requests")
 				espXmlmc.OpenElement("primaryEntityData")
@@ -506,6 +505,9 @@ func logNewCall(callClass string, callMap map[string]interface{}, swCallID strin
 					logger(4, "Unable to place request on hold ["+strNewCallRef+"] : "+xmlRespon.State.ErrorRet, false)
 				}
 			}
+
+			//Add file attachments to request
+			processFileAttachments(swCallID, strNewCallRef)
 		}
 	} else {
 		//-- DEBUG XML TO LOG FILE
