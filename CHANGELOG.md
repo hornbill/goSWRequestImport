@@ -1,3 +1,10 @@
+## 1.4.1 (November 30th 2017)
+
+Defect Fix:
+- Now sending UTC time to Hornbill APIs to ensure correct log date being applied
+
+
+
 ## 1.4.0 (November 28th 2017)
 
 Defect Fix:

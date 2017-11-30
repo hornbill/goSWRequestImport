@@ -126,7 +126,7 @@ func epochToDateTime(epochDateString string) string {
 	if err != nil {
 		logger(5, "EPOCH String to Int conversion FAILED: "+fmt.Sprintf("%v", err), false)
 	} else {
-		dateTimeStr := fmt.Sprintf("%s", time.Unix(i, 0))
+		dateTimeStr := fmt.Sprintf("%s", time.Unix(i, 0).UTC()) //Force UTC
 		for i := 0; i < 19; i++ {
 			dateTime = dateTime + string(dateTimeStr[i])
 		}
