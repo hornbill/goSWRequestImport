@@ -30,12 +30,13 @@ func processFileAttachments(swCallRef, smCallRef string) {
 		//fmt.Println(fileRecord)
 		if fileRecord.UpdateID == "999999999" {
 			entityRequest = "Requests"
-			updateID, _ := strconv.Atoi(fileRecord.UpdateID)
-			updateID = updateID - 1
-			fileRecord.UpdateID = strconv.Itoa(updateID)
 		} else {
 			entityRequest = "RequestHistoricUpdateAttachments"
 		}
+
+		updateID, _ := strconv.Atoi(fileRecord.UpdateID)
+		updateID = updateID - 1
+		fileRecord.UpdateID = strconv.Itoa(updateID)
 
 		fileRecord.Extension = filepath.Ext(fileRecord.FileName)
 		if fileRecord.Extension == ".swm" {
@@ -123,7 +124,7 @@ func fileAttachmentData(swRequest, smRequest string) []fileAssocStruct {
 	//logger(3, "[DATABASE] Running query for Request File Attachments. Please wait...", false)
 
 	//build query
-	sqlFileQuery := "SELECT fileid, callref, dataid, updateid as updateid, compressed, sizeu, sizec, filename, addedby, timeadded, filetime"
+	sqlFileQuery := "SELECT fileid, callref, dataid, updateid, compressed, sizeu, sizec, filename, addedby, timeadded, filetime"
 	sqlFileQuery = sqlFileQuery + " FROM system_cfastore WHERE callref = " + intSwCallRef
 	//logger(3, "[DATABASE] Request File Attachments Query: "+sqlFileQuery, false)
 	//Run Query

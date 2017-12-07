@@ -1,9 +1,15 @@
+## 1.4.2 (December 7th 2017)
+
+Defect Fix:
+- Corrected issue with historic update attachments being associated to the incorrect historic update within the same request
+
+Feature:
+- Improved output when unable to connect to the Hornbill instance
+
 ## 1.4.1 (November 30th 2017)
 
 Defect Fix:
 - Now sending UTC time to Hornbill APIs to ensure correct log date being applied
-
-
 
 ## 1.4.0 (November 28th 2017)
 

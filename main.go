@@ -86,7 +86,6 @@ func main() {
 	//-- Log in to Hornbill instance
 	var boolLogin = login()
 	if boolLogin != true {
-		logger(4, "Unable to Login ", true)
 		return
 	}
 	//-- Defer log out of Hornbill instance until after main() is complete

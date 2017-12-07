@@ -4,7 +4,6 @@ import (
 	"encoding/base64"
 	"encoding/xml"
 	"fmt"
-	"log"
 	"time"
 
 	"github.com/hornbill/goapiLib"
@@ -177,7 +176,8 @@ func login() bool {
 	espXmlmc.SetParam("password", base64.StdEncoding.EncodeToString([]byte(swImportConf.HBConf.Password)))
 	XMLLogin, xmlmcErr := espXmlmc.Invoke("session", "userLogon")
 	if xmlmcErr != nil {
-		log.Fatal(xmlmcErr)
+		logger(4, "Unable to Login: "+fmt.Sprintf("%v", xmlmcErr), true)
+		return false
 	}
 
 	var xmlRespon xmlmcResponse
