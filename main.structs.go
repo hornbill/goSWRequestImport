@@ -8,7 +8,7 @@ import (
 )
 
 const (
-	version           = "1.4.2"
+	version           = "1.4.3"
 	appServiceManager = "com.hornbill.servicemanager"
 	//Disk Space Declarations
 	sizeKB float64 = 1 << (10 * 1)
@@ -287,6 +287,7 @@ type xmlmcAttachmentResponse struct {
 type xmlmcEmailAttachmentResponse struct {
 	MethodResult    string             `xml:"status,attr"`
 	Recipients      []recipientStruct  `xml:"params>recipient"`
+	RFCHeader       string             `xml:"params>rfcHeader"`
 	Subject         string             `xml:"params>subject"`
 	Body            string             `xml:"params>body"`
 	HTMLBody        string             `xml:"params>htmlBody"`

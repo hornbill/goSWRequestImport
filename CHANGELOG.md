@@ -1,3 +1,16 @@
+## 1.4.3 (December 8th 2017)
+
+Features:
+- Now removes any incompatible (non UTF-8) characters from the decoded Supportworks Mail file response
+- Improved output of SWM file text representation, included RFC headers and made line feeds Windows compatible.
+
+Defect fixes:
+- Fixed "null" value issue for date/time of file attachments
+- Fixed warnings thrown when date/time is string instead of EPOCH
+
+Feature:
+- Improved output when unable to connect to the Hornbill instance
+
 ## 1.4.2 (December 7th 2017)
 
 Defect Fix:

@@ -10,6 +10,7 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+	"unicode/utf8"
 
 	"github.com/hornbill/sqlx"
 )
@@ -193,6 +194,22 @@ func decodeSWMFile(fileRecord fileAssocStruct) (swmStruct, bool) {
 		logger(5, "API Error response from decodeCompositeMessage: "+fmt.Sprintf("%v", xmlmcErrEmail), false)
 		return returnStruct, false
 	}
+
+	//Strip non-utf-8 characters from decoded email response
+	if !utf8.ValidString(XMLEmailDecoded) {
+		v := make([]rune, 0, len(XMLEmailDecoded))
+		for i, r := range XMLEmailDecoded {
+			if r == utf8.RuneError {
+				_, size := utf8.DecodeRuneInString(XMLEmailDecoded[i:])
+				if size == 1 {
+					continue
+				}
+			}
+			v = append(v, r)
+		}
+		XMLEmailDecoded = string(v)
+	}
+
 	var xmlResponEmail xmlmcEmailAttachmentResponse
 	errUnmarshall := xml.Unmarshal([]byte(XMLEmailDecoded), &xmlResponEmail)
 	if errUnmarshall != nil {
@@ -230,15 +247,17 @@ func decodeSWMFile(fileRecord fileAssocStruct) (swmStruct, bool) {
 	} else {
 		bodyText = xmlResponEmail.HTMLBody
 	}
+
 	returnStruct.Subject = "Subject: " + xmlResponEmail.Subject
-	returnStruct.Content = "From: " + fromAddress + "\r\n"
+	returnStruct.Content = "RFC Header: " + strings.Replace(xmlResponEmail.RFCHeader, "\n", "\r\n", -1) + "\r\n" + strings.Repeat("-", 50) + "\r\n"
+	returnStruct.Content = returnStruct.Content + "From: " + fromAddress + "\r\n"
 	returnStruct.Content = returnStruct.Content + "To: " + toAddress + "\r\n"
 	if xmlResponEmail.TimeSent != "" {
-		returnStruct.Content = returnStruct.Content + "Sent: " + epochToDateTime(xmlResponEmail.TimeSent) + "\r\n"
+		returnStruct.Content = returnStruct.Content + "Sent: " + xmlResponEmail.TimeSent + "\r\n"
 	}
 	returnStruct.Content = returnStruct.Content + returnStruct.Subject + "\r\n"
-	returnStruct.Content = returnStruct.Content + strings.Repeat("-", len(returnStruct.Subject)) + "\r\n"
-	returnStruct.Content = returnStruct.Content + bodyText
+	returnStruct.Content = returnStruct.Content + strings.Repeat("-", 50) + "\r\n"
+	returnStruct.Content = returnStruct.Content + strings.Replace(bodyText, "\n", "\r\n", -1)
 	return returnStruct, true
 }
 
@@ -260,7 +279,6 @@ func addFileContent(entityName string, fileRecord fileAssocStruct) bool {
 	if entityName == "Requests" {
 		attPriKey = fileRecord.SmCallRef
 	}
-
 	filenameReplacer := strings.NewReplacer("<", "_", ">", "_", "|", "_", "\\", "_", "/", "_", ":", "_", "*", "_", "?", "_", "\"", "_")
 	useFileName := fmt.Sprintf("%s", filenameReplacer.Replace(fileRecord.FileName))
 	if entityName == "RequestHistoricUpdateAttachments" {
@@ -360,7 +378,7 @@ func addFileContent(entityName string, fileRecord fileAssocStruct) bool {
 
 					espXmlmc.SetParam("h_filename", useFileName)
 					espXmlmc.SetParam("h_contentlocation", xmlRespon.ContentLocation)
-					espXmlmc.SetParam("h_timestamp", fileRecord.TimeAdded)
+					espXmlmc.SetParam("h_timestamp", epochToDateTime(fileRecord.TimeAdded))
 					espXmlmc.SetParam("h_visibility", "trustedGuest")
 					espXmlmc.CloseElement("record")
 					espXmlmc.CloseElement("primaryEntityData")
