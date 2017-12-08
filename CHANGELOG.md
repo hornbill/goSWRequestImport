@@ -8,9 +8,6 @@ Defect fixes:
 - Fixed "null" value issue for date/time of file attachments
 - Fixed warnings thrown when date/time is string instead of EPOCH
 
-Feature:
-- Improved output when unable to connect to the Hornbill instance
-
 ## 1.4.2 (December 7th 2017)
 
 Defect Fix:
