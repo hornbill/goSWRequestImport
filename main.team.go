@@ -48,14 +48,22 @@ func searchTeam(teamName string) (bool, string) {
 		return false, "Unable to create connection"
 	}
 	//-- ESP Query for team
-	espXmlmc.SetParam("entity", "Groups")
+	espXmlmc.SetParam("application", "com.hornbill.servicemanager")
+	espXmlmc.SetParam("entity", "Team")
 	espXmlmc.SetParam("matchScope", "all")
 	espXmlmc.OpenElement("searchFilter")
-	espXmlmc.SetParam("h_name", teamName)
+	espXmlmc.SetParam("column", "h_name")
+	espXmlmc.SetParam("value", teamName)
+	espXmlmc.SetParam("matchType", "exact")
+	espXmlmc.CloseElement("searchFilter")
+	espXmlmc.OpenElement("searchFilter")
+	espXmlmc.SetParam("column", "h_type")
+	espXmlmc.SetParam("value", "1")
+	espXmlmc.SetParam("matchType", "exact")
 	espXmlmc.CloseElement("searchFilter")
 	espXmlmc.SetParam("maxResults", "1")
 
-	XMLTeamSearch, xmlmcErr := espXmlmc.Invoke("data", "entityBrowseRecords")
+	XMLTeamSearch, xmlmcErr := espXmlmc.Invoke("data", "entityBrowseRecords2")
 	if xmlmcErr != nil {
 		logger(4, "Unable to Search for Team: "+fmt.Sprintf("%v", xmlmcErr), false)
 		//log.Fatal(xmlmcErr)

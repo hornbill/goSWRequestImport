@@ -1,3 +1,8 @@
+## 1.4.4 (December 12th 2017)
+
+Defect fix:
+- Fixed issue where team mapping could return other groups of the same name.
+
 ## 1.4.3 (December 8th 2017)
 
 Features:
