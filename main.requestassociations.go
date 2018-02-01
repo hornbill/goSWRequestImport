@@ -13,11 +13,11 @@ func processCallAssociations() {
 	logger(1, "Processing Request Associations, please wait...", true)
 	//Connect to the JSON specified DB
 	db, err := sqlx.Open(appDBDriver, connStrAppDB)
-	defer db.Close()
 	if err != nil {
 		logger(4, " [DATABASE] Database Connection Error for Request Associations: "+fmt.Sprintf("%v", err), false)
 		return
 	}
+	defer db.Close()
 	//Check connection is open
 	err = db.Ping()
 	if err != nil {

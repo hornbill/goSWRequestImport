@@ -6,7 +6,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/hornbill/goapiLib"
+	_ "github.com/hornbill/goapiLib"
 	"github.com/hornbill/pb"
 )
 
@@ -38,7 +38,7 @@ func processCallData() {
 
 				currentCallRef := padCallRef(callID, "F", 7)
 
-				boolCallLogged, hbCallRef := logNewCall(mapGenericConf.CallClass, callRecordArr, callID, espXmlmc)
+				boolCallLogged, hbCallRef := logNewCall(mapGenericConf.CallClass, callRecordArr, callID)
 				if boolCallLogged {
 					logger(3, "[REQUEST LOGGED] Request logged successfully: "+hbCallRef+" from Supportworks call "+currentCallRef, false)
 				} else {
@@ -56,7 +56,7 @@ func processCallData() {
 }
 
 //logNewCall - Function takes Supportworks call data in a map, and logs to Hornbill
-func logNewCall(callClass string, callMap map[string]interface{}, swCallID string, espXmlmc *apiLib.XmlmcInstStruct) (bool, string) {
+func logNewCall(callClass string, callMap map[string]interface{}, swCallID string) (bool, string) {
 
 	boolCallLoggedOK := false
 	strNewCallRef := ""
@@ -511,7 +511,7 @@ func logNewCall(callClass string, callMap map[string]interface{}, swCallID strin
 	} else {
 		//-- DEBUG XML TO LOG FILE
 		var XMLSTRING = espXmlmc.GetParam()
-		logger(1, "Request Log XML "+fmt.Sprintf("%s", XMLSTRING), false)
+		logger(1, "Request Log XML "+XMLSTRING, false)
 		counters.Lock()
 		counters.createdSkipped++
 		counters.Unlock()

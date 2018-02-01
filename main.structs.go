@@ -41,7 +41,6 @@ var (
 	services               []serviceListStruct
 	sites                  []siteListStruct
 	teams                  []teamListStruct
-	importFiles            []fileAssocStruct
 	sqlCallQuery           string
 	swImportConf           swImportConfStruct
 	timeNow                string
@@ -60,8 +59,6 @@ var (
 	mutexSites             = &sync.Mutex{}
 	mutexTeams             = &sync.Mutex{}
 	wgRequest              sync.WaitGroup
-	wgAssoc                sync.WaitGroup
-	wgFile                 sync.WaitGroup
 	reqPrefix              string
 	maxGoroutines          = 1
 	boolProcessAttachments bool
@@ -241,12 +238,12 @@ type xmlmcCategoryListResponse struct {
 }
 
 //----- Audit Structs
-type xmlmcAuditListResponse struct {
+/*type xmlmcAuditListResponse struct {
 	MethodResult     string      `xml:"status,attr"`
 	TotalStorage     float64     `xml:"params>maxStorageAvailble"`
 	TotalStorageUsed float64     `xml:"params>totalStorageUsed"`
 	State            stateStruct `xml:"state"`
-}
+}*/
 
 //----- Analyst Structs
 type analystListStruct struct {

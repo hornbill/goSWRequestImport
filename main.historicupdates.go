@@ -18,11 +18,11 @@ func applyHistoricalUpdates(newCallRef string, swCallRef string) bool {
 	}
 	//Connect to the JSON specified DB
 	db, err := sqlx.Open(appDBDriver, connStrAppDB)
-	defer db.Close()
 	if err != nil {
 		logger(4, " [DATABASE] Database Connection Error for Historical Updates: "+fmt.Sprintf("%v", err), false)
 		return false
 	}
+	defer db.Close()
 	//Check connection is open
 	err = db.Ping()
 	if err != nil {
@@ -153,7 +153,7 @@ func applyHistoricalUpdates(newCallRef string, swCallRef string) bool {
 			} else {
 				//-- DEBUG XML TO LOG FILE
 				var XMLSTRING = espXmlmc.GetParam()
-				logger(1, "Request Historical Update XML "+fmt.Sprintf("%s", XMLSTRING), false)
+				logger(1, "Request Historical Update XML "+XMLSTRING, false)
 				counters.Lock()
 				counters.createdSkipped++
 				counters.Unlock()

@@ -25,8 +25,8 @@ func main() {
 
 	//-- Output to CLI and Log
 	logger(1, "---- Supportworks Call Import Utility V"+fmt.Sprintf("%v", version)+" ----", true)
-	logger(1, "Flag - Config File "+fmt.Sprintf("%s", configFileName), true)
-	logger(1, "Flag - Zone "+fmt.Sprintf("%s", configZone), true)
+	logger(1, "Flag - Config File "+configFileName, true)
+	logger(1, "Flag - Zone "+configZone, true)
 	logger(1, "Flag - Dry Run "+fmt.Sprintf("%v", configDryRun), true)
 	logger(1, "Flag - Concurrent Requests "+fmt.Sprintf("%v", configMaxRoutines), true)
 

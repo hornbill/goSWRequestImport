@@ -24,13 +24,11 @@ func SetInstance(strZone string, instanceID string) {
 	SetZone(strZone)
 	//-- Set Instance
 	xmlmcInstanceConfig.instance = instanceID
-	return
 }
 
 // SetZone - sets the Instance Zone to Overide current live zone
 func SetZone(zone string) {
 	xmlmcInstanceConfig.zone = zone
-	return
 }
 
 // getInstanceURL -- Function to build XMLMC End Point
@@ -142,7 +140,7 @@ func doesCustomerExist(customerID string) bool {
 	return boolCustomerExists
 }
 
-func checkInstanceSession() (string, bool) {
+/*func checkInstanceSession() (string, bool) {
 	errorMessage := ""
 	boolValid := false
 	espXmlmc := apiLib.NewXmlmcInstance(swImportConf.HBConf.URL)
@@ -156,7 +154,7 @@ func checkInstanceSession() (string, bool) {
 	}
 
 	return errorMessage, boolValid
-}
+}*/
 
 //NewEspXmlmcSession - New Xmlmc Session variable (Cloned Session)
 func NewEspXmlmcSession() (*apiLib.XmlmcInstStruct, error) {

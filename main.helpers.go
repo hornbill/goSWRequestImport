@@ -130,7 +130,7 @@ func epochToDateTime(epochDateString string) string {
 	if err != nil {
 		logger(5, "EPOCH String to Int conversion FAILED: "+fmt.Sprintf("%v", err), false)
 	} else {
-		dateTimeStr := fmt.Sprintf("%s", time.Unix(i, 0).UTC()) //Force UTC
+		dateTimeStr := time.Unix(i, 0).UTC().String() //Force UTC
 		for i := 0; i < 19; i++ {
 			dateTime = dateTime + string(dateTimeStr[i])
 		}
@@ -161,7 +161,7 @@ func convExtendedColName(oldColName string) string {
 }
 
 //confirmResponse - prompts user, expects a fuzzy yes or no response, does not continue until this is given
-func confirmResponse() bool {
+/*func confirmResponse() bool {
 	var cmdResponse string
 	_, errResponse := fmt.Scanln(&cmdResponse)
 	if errResponse != nil {
@@ -175,10 +175,10 @@ func confirmResponse() bool {
 		color.Red("Please enter yes or no to continue:")
 		return confirmResponse()
 	}
-}
+}*/
 
 //convFloattoSizeStr - takes given float64 value, returns a human readable storage capacity string
-func convFloattoSizeStr(floatNum float64) (strReturn string) {
+/*func convFloattoSizeStr(floatNum float64) (strReturn string) {
 	if floatNum >= sizePB {
 		strReturn = fmt.Sprintf("%.2fPB", floatNum/sizePB)
 	} else if floatNum >= sizeTB {
@@ -193,7 +193,7 @@ func convFloattoSizeStr(floatNum float64) (strReturn string) {
 		strReturn = fmt.Sprintf("%vB", int(floatNum))
 	}
 	return
-}
+}*/
 
 //parseFlags - grabs and parses command line flags
 func parseFlags() {

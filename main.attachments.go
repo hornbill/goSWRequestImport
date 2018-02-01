@@ -92,8 +92,7 @@ func getFileEncoded(fileRecord fileAssocStruct) string {
 	defer file.Close()
 	// create a new buffer base on file size
 	fInfo, _ := file.Stat()
-	var size int64
-	size = fInfo.Size()
+	size := fInfo.Size()
 	buf := make([]byte, size)
 
 	// read file content into buffer
@@ -110,11 +109,11 @@ func fileAttachmentData(swRequest, smRequest string) []fileAssocStruct {
 	var returnArray = make([]fileAssocStruct, 0)
 	//Connect to the JSON specified DB
 	db, err := sqlx.Open(cacheDBDriver, connStrSysDB)
-	defer db.Close()
 	if err != nil {
 		logger(4, "[DATABASE] Database Connection Error for Request File Attachments: "+fmt.Sprintf("%v", err), true)
 		return returnArray
 	}
+	defer db.Close()
 	//Check connection is open
 	err = db.Ping()
 	if err != nil {
@@ -173,8 +172,7 @@ func decodeSWMFile(fileRecord fileAssocStruct) (swmStruct, bool) {
 	defer file.Close()
 	// create a new buffer base on file size
 	fInfo, _ := file.Stat()
-	var size int64
-	size = fInfo.Size()
+	size := fInfo.Size()
 	buf := make([]byte, size)
 
 	// read file content into buffer
@@ -280,7 +278,7 @@ func addFileContent(entityName string, fileRecord fileAssocStruct) bool {
 		attPriKey = fileRecord.SmCallRef
 	}
 	filenameReplacer := strings.NewReplacer("<", "_", ">", "_", "|", "_", "\\", "_", "/", "_", ":", "_", "*", "_", "?", "_", "\"", "_")
-	useFileName := fmt.Sprintf("%s", filenameReplacer.Replace(fileRecord.FileName))
+	useFileName := filenameReplacer.Replace(fileRecord.FileName)
 	if entityName == "RequestHistoricUpdateAttachments" {
 		espXmlmc.SetParam("application", appServiceManager)
 		espXmlmc.SetParam("entity", "RequestHistoricUpdateAttachments")
@@ -306,19 +304,19 @@ func addFileContent(entityName string, fileRecord fileAssocStruct) bool {
 		XMLHistAtt, xmlmcErr := espXmlmc.Invoke("data", "entityAddRecord")
 		if xmlmcErr != nil {
 			logger(1, "RequestHistoricUpdateAttachments entityAddRecord Failed "+fmt.Sprintf("%s", xmlmcErr), false)
-			logger(1, "RequestHistoricUpdateAttachments entityAddRecord Failed File Attachment Record XML "+fmt.Sprintf("%s", XMLSTRING), false)
+			logger(1, "RequestHistoricUpdateAttachments entityAddRecord Failed File Attachment Record XML "+XMLSTRING, false)
 			return false
 		}
 		var xmlRespon xmlmcAttachmentResponse
 		errXMLMC := xml.Unmarshal([]byte(XMLHistAtt), &xmlRespon)
 		if errXMLMC != nil {
 			logger(4, "Unable to read response from Hornbill instance for Update File Attachment Record Insertion ["+useFileName+"] ["+fileRecord.SmCallRef+"]:"+fmt.Sprintf("%v", errXMLMC), false)
-			logger(1, "File Attachment Record XML "+fmt.Sprintf("%s", XMLSTRING), false)
+			logger(1, "File Attachment Record XML "+XMLSTRING, false)
 			return false
 		}
 		if xmlRespon.MethodResult != "ok" {
 			logger(4, "Unable to process Update File Attachment Record Insertion ["+useFileName+"] ["+fileRecord.SmCallRef+"]: "+xmlRespon.State.ErrorRet, false)
-			logger(1, "File Attachment Record XML "+fmt.Sprintf("%s", XMLSTRING), false)
+			logger(1, "File Attachment Record XML "+XMLSTRING, false)
 			return false
 		}
 		logger(1, "Historic Update File Attactment Record Insertion Success ["+useFileName+"] ["+fileRecord.SmCallRef+"]", false)
@@ -339,7 +337,7 @@ func addFileContent(entityName string, fileRecord fileAssocStruct) bool {
 	XMLAttach, xmlmcErr := espXmlmc.Invoke("data", "entityAttachFile")
 	if xmlmcErr != nil {
 		logger(4, "Could not add Attachment File Data for ["+useFileName+"] ["+fileRecord.SmCallRef+"]: "+fmt.Sprintf("%v", xmlmcErr), false)
-		logger(1, "File Data Record XML "+fmt.Sprintf("%s", XMLSTRINGDATA), false)
+		logger(1, "File Data Record XML "+XMLSTRINGDATA, false)
 		return false
 	}
 	var xmlRespon xmlmcAttachmentResponse
@@ -347,11 +345,11 @@ func addFileContent(entityName string, fileRecord fileAssocStruct) bool {
 	err := xml.Unmarshal([]byte(XMLAttach), &xmlRespon)
 	if err != nil {
 		logger(4, "Could not add Attachment File Data for ["+useFileName+"] ["+fileRecord.SmCallRef+"]: "+fmt.Sprintf("%v", err), false)
-		logger(1, "File Data Record XML "+fmt.Sprintf("%s", XMLSTRINGDATA), false)
+		logger(1, "File Data Record XML "+XMLSTRINGDATA, false)
 	} else {
 		if xmlRespon.MethodResult != "ok" {
 			logger(4, "Could not add Attachment File Data for ["+useFileName+"] ["+fileRecord.SmCallRef+"]: "+xmlRespon.State.ErrorRet, false)
-			logger(1, "File Data Record XML "+fmt.Sprintf("%s", XMLSTRINGDATA), false)
+			logger(1, "File Data Record XML "+XMLSTRINGDATA, false)
 		} else {
 			//-- If we've got a Content Location back from the API, update the file record with this
 			if xmlRespon.ContentLocation != "" {
@@ -389,7 +387,7 @@ func addFileContent(entityName string, fileRecord fileAssocStruct) bool {
 				XMLContentLoc, xmlmcErrContent := espXmlmc.Invoke(strService, strMethod)
 				if xmlmcErrContent != nil {
 					logger(4, "Could not update request ["+fileRecord.SmCallRef+"] with attachment ["+useFileName+"]: "+fmt.Sprintf("%v", xmlmcErrContent), false)
-					logger(1, "File Data Record XML "+fmt.Sprintf("%s", XMLSTRINGDATA), false)
+					logger(1, "File Data Record XML "+XMLSTRINGDATA, false)
 					return false
 				}
 				var xmlResponLoc xmlmcResponse
@@ -397,12 +395,12 @@ func addFileContent(entityName string, fileRecord fileAssocStruct) bool {
 				err = xml.Unmarshal([]byte(XMLContentLoc), &xmlResponLoc)
 				if err != nil {
 					logger(4, "Added file data to but unable to set Content Location on ["+fileRecord.SmCallRef+"] for File Content ["+useFileName+"] - read response from Hornbill instance:"+fmt.Sprintf("%v", err), false)
-					logger(1, "File Data Record XML "+fmt.Sprintf("%s", XMLSTRINGDATA), false)
+					logger(1, "File Data Record XML "+XMLSTRINGDATA, false)
 					return false
 				}
 				if xmlResponLoc.MethodResult != "ok" {
 					logger(4, "Added file data but unable to set Content Location on ["+fileRecord.SmCallRef+"] for File Content ["+useFileName+"]: "+xmlResponLoc.State.ErrorRet, false)
-					logger(1, "File Data Record XML "+fmt.Sprintf("%s", XMLSTRINGDATA), false)
+					logger(1, "File Data Record XML "+XMLSTRINGDATA, false)
 					return false
 				}
 				logger(1, entityName+" File Content ["+useFileName+"] Added to ["+fileRecord.SmCallRef+"] Successfully", false)

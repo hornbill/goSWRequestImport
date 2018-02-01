@@ -29,16 +29,14 @@ func buildConnectionString(strDataSource string) string {
 				connectString = connectString + ";encrypt=disable"
 			}
 			if swImportConf.SWAppDBConf.Port != 0 {
-				var dbPortSetting string
-				dbPortSetting = strconv.Itoa(swImportConf.SWAppDBConf.Port)
+				dbPortSetting := strconv.Itoa(swImportConf.SWAppDBConf.Port)
 				connectString = connectString + ";port=" + dbPortSetting
 			}
 		case "mysql":
 			connectString = swImportConf.SWAppDBConf.UserName + ":" + swImportConf.SWAppDBConf.Password
 			connectString = connectString + "@tcp(" + swImportConf.SWAppDBConf.Server + ":"
 			if swImportConf.SWAppDBConf.Port != 0 {
-				var dbPortSetting string
-				dbPortSetting = strconv.Itoa(swImportConf.SWAppDBConf.Port)
+				dbPortSetting := strconv.Itoa(swImportConf.SWAppDBConf.Port)
 				connectString = connectString + dbPortSetting
 			} else {
 				connectString = connectString + "3306"
@@ -46,8 +44,7 @@ func buildConnectionString(strDataSource string) string {
 			connectString = connectString + ")/" + swImportConf.SWAppDBConf.Database
 
 		case "mysql320":
-			var dbPortSetting string
-			dbPortSetting = strconv.Itoa(swImportConf.SWAppDBConf.Port)
+			dbPortSetting := strconv.Itoa(swImportConf.SWAppDBConf.Port)
 			connectString = "tcp:" + swImportConf.SWAppDBConf.Server + ":" + dbPortSetting
 			connectString = connectString + "*" + swImportConf.SWAppDBConf.Database + "/" + swImportConf.SWAppDBConf.UserName + "/" + swImportConf.SWAppDBConf.Password
 		}
@@ -75,11 +72,11 @@ func queryDBCallDetails(callClass, swCallClass, connString string) bool {
 	}
 	//Connect to the JSON specified DB
 	db, err := sqlx.Open(appDBDriver, connString)
-	defer db.Close()
 	if err != nil {
 		logger(4, "[DATABASE] Database Connection Error: "+fmt.Sprintf("%v", err), true)
 		return false
 	}
+	defer db.Close()
 	//Check connection is open
 	err = db.Ping()
 	if err != nil {
@@ -99,6 +96,7 @@ func queryDBCallDetails(callClass, swCallClass, connString string) bool {
 		logger(4, " Database Query Error: "+fmt.Sprintf("%v", err), true)
 		return false
 	}
+	defer rows.Close()
 	//Clear down existing Call Details map
 	arrCallDetailsMaps = nil
 	//Build map full of calls to import
@@ -107,10 +105,14 @@ func queryDBCallDetails(callClass, swCallClass, connString string) bool {
 		intCallCount++
 		results := make(map[string]interface{})
 		err = rows.MapScan(results)
+		if err != nil {
+			//something is wrong with this row just log then skip it
+			logger(4, " Database Result error"+err.Error(), true)
+			continue
+		}
 		//Stick marshalled data map in to parent slice
 		arrCallDetailsMaps = append(arrCallDetailsMaps, results)
 	}
-	defer rows.Close()
 	return true
 }
 
