@@ -3,6 +3,7 @@ package main
 import (
 	"encoding/xml"
 	"fmt"
+	"sync"
 
 	"github.com/hornbill/sqlx"
 )
@@ -36,11 +37,17 @@ func processCallAssociations() {
 		return
 	}
 
-	//Process each association record, insert in to Hornbill
-	//fmt.Println("Maximum Request Association Go Routines:", maxGoroutines)
-	maxGoroutinesGuard := make(chan struct{}, maxGoroutines)
+	var wg sync.WaitGroup
+
+	jobs := make(chan refStruct, maxGoroutines)
+
+	for w := 1; w <= maxGoroutines; w++ {
+		go addAssocRecord(jobs, wg)
+	}
+
 	for rows.Next() {
 		var requestRels reqRelStruct
+		wg.Add(1)
 
 		errDataMap := rows.StructScan(&requestRels)
 		if errDataMap != nil {
@@ -50,48 +57,57 @@ func processCallAssociations() {
 		smMasterRef, mrOK := arrCallsLogged[requestRels.MasterRef]
 		smSlaveRef, srOK := arrCallsLogged[requestRels.SlaveRef]
 
-		maxGoroutinesGuard <- struct{}{}
-		wgAssoc.Add(1)
-		go func() {
-			defer wgAssoc.Done()
-			if mrOK == true && smMasterRef != "" && srOK == true && smSlaveRef != "" {
-				//We have Master and Slave calls matched in the SM database
-				addAssocRecord(smMasterRef, smSlaveRef)
-			}
-			<-maxGoroutinesGuard
-		}()
+		if mrOK == true && smMasterRef != "" && srOK == true && smSlaveRef != "" {
+			//We have Master and Slave calls matched in the SM database
+
+			jobs <- refStruct{MasterRef: smMasterRef, SlaveRef: smSlaveRef}
+		}
 	}
-	wgAssoc.Wait()
+
+	close(jobs)
+	wg.Wait()
+
 	logger(1, "Request Association Processing Complete", true)
 }
 
 //addAssocRecord - given a Master Reference and a Slave Refernce, adds a call association record to Service Manager
-func addAssocRecord(masterRef string, slaveRef string) {
+func addAssocRecord(jobs chan refStruct, wg sync.WaitGroup) {
+
 	espXmlmc, err := NewEspXmlmcSession()
 	if err != nil {
+		logger(4, "Could not connect to Hornbill Instance", false)
+		wg.Done()
 		return
+
 	}
-	espXmlmc.SetParam("entityId", masterRef)
-	espXmlmc.SetParam("entityName", "Requests")
-	espXmlmc.SetParam("linkedEntityId", slaveRef)
-	espXmlmc.SetParam("linkedEntityName", "Requests")
-	espXmlmc.SetParam("updateTimeline", "true")
-	espXmlmc.SetParam("visibility", "trustedGuest")
-	XMLUpdate, xmlmcErr := espXmlmc.Invoke("apps/com.hornbill.servicemanager/RelationshipEntities", "add")
-	if xmlmcErr != nil {
-		//		log.Fatal(xmlmcErr)
-		logger(4, "Unable to create Request Association between ["+masterRef+"] and ["+slaveRef+"] :"+fmt.Sprintf("%v", xmlmcErr), false)
-		return
+
+	for asset := range jobs {
+		espXmlmc.SetParam("entityId", asset.MasterRef)
+		espXmlmc.SetParam("entityName", "Requests")
+		espXmlmc.SetParam("linkedEntityId", asset.SlaveRef)
+		espXmlmc.SetParam("linkedEntityName", "Requests")
+		espXmlmc.SetParam("updateTimeline", "true")
+		espXmlmc.SetParam("visibility", "trustedGuest")
+		XMLUpdate, xmlmcErr := espXmlmc.Invoke("apps/com.hornbill.servicemanager/RelationshipEntities", "add")
+		if xmlmcErr != nil {
+			//		log.Fatal(xmlmcErr)
+			logger(4, "Unable to create Request Association between ["+asset.MasterRef+"] and ["+asset.SlaveRef+"] :"+fmt.Sprintf("%v", xmlmcErr), false)
+			wg.Done()
+			return
+		}
+		var xmlRespon xmlmcResponse
+		errXMLMC := xml.Unmarshal([]byte(XMLUpdate), &xmlRespon)
+		if errXMLMC != nil {
+			logger(4, "Unable to read response from Hornbill instance for Request Association between ["+asset.MasterRef+"] and ["+asset.SlaveRef+"] :"+fmt.Sprintf("%v", errXMLMC), false)
+			wg.Done()
+			return
+		}
+		if xmlRespon.MethodResult != "ok" {
+			logger(5, "Unable to add Request Association between ["+asset.MasterRef+"] and ["+asset.SlaveRef+"] : "+xmlRespon.State.ErrorRet, false)
+			wg.Done()
+			return
+		}
+		logger(1, "Request Association Success between ["+asset.MasterRef+"] and ["+asset.SlaveRef+"]", false)
+		wg.Done()
 	}
-	var xmlRespon xmlmcResponse
-	errXMLMC := xml.Unmarshal([]byte(XMLUpdate), &xmlRespon)
-	if errXMLMC != nil {
-		logger(4, "Unable to read response from Hornbill instance for Request Association between ["+masterRef+"] and ["+slaveRef+"] :"+fmt.Sprintf("%v", errXMLMC), false)
-		return
-	}
-	if xmlRespon.MethodResult != "ok" {
-		logger(5, "Unable to add Request Association between ["+masterRef+"] and ["+slaveRef+"] : "+xmlRespon.State.ErrorRet, false)
-		return
-	}
-	logger(1, "Request Association Success between ["+masterRef+"] and ["+slaveRef+"]", false)
 }

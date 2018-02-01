@@ -99,6 +99,10 @@ type hbConfStruct struct {
 	Password   string
 	URL        string
 }
+type refStruct struct {
+	MasterRef string
+	SlaveRef  string
+}
 type sysDBConfStruct struct {
 	Driver   string
 	UserName string

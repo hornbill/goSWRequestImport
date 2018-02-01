@@ -378,7 +378,6 @@ func logNewCall(callClass string, callMap map[string]interface{}, swCallID strin
 			counters.Unlock()
 			boolCallLoggedOK = true
 
-
 			//Now update the request to create the activity stream
 			espXmlmc.SetParam("socialObjectRef", "urn:sys:entity:"+appServiceManager+":Requests:"+strNewCallRef)
 			espXmlmc.SetParam("content", "Request imported from Supportworks")

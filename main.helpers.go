@@ -66,6 +66,10 @@ func logger(t int, s string, outputtoCLI bool) {
 	//-- Open Log File
 	f, err := os.OpenFile(logFileName, os.O_APPEND|os.O_CREATE|os.O_RDWR, 0777)
 	// don't forget to close it
+	if err != nil {
+		//We didnt manage to open the log file so exit the function
+		return
+	}
 	defer f.Close()
 	if err != nil {
 		color.Red("Error Creating Log File %q: %s \n", logFileName, err)
