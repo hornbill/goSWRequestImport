@@ -11,11 +11,7 @@ import (
 )
 
 //applyHistoricalUpdates - takes call diary records from Supportworks, imports to Hornbill as Historical Updates
-func applyHistoricalUpdates(newCallRef string, swCallRef string) bool {
-	espXmlmc, err := NewEspXmlmcSession()
-	if err != nil {
-		return false
-	}
+func applyHistoricalUpdates(newCallRef string, swCallRef string, espXmlmc *apiLib.XmlmcInstStruct) bool {
 	//Connect to the JSON specified DB
 	db, err := sqlx.Open(appDBDriver, connStrAppDB)
 	if err != nil {
@@ -43,6 +39,7 @@ func applyHistoricalUpdates(newCallRef string, swCallRef string) bool {
 		logger(4, " Database Query Error: "+fmt.Sprintf("%v", err), false)
 		return false
 	}
+	defer rows.Close()
 
 	//Process each call diary entry, insert in to Hornbill
 	for rows.Next() {
@@ -162,9 +159,6 @@ func applyHistoricalUpdates(newCallRef string, swCallRef string) bool {
 			}
 		}
 	}
-
-	defer rows.Close()
-
 	return true
 }
 

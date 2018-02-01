@@ -52,6 +52,7 @@ func processCallAssociations() {
 		errDataMap := rows.StructScan(&requestRels)
 		if errDataMap != nil {
 			logger(4, " Data Mapping Error: "+fmt.Sprintf("%v", errDataMap), false)
+			wg.Done()
 			return
 		}
 		smMasterRef, mrOK := arrCallsLogged[requestRels.MasterRef]
@@ -59,7 +60,6 @@ func processCallAssociations() {
 
 		if mrOK == true && smMasterRef != "" && srOK == true && smSlaveRef != "" {
 			//We have Master and Slave calls matched in the SM database
-
 			jobs <- refStruct{MasterRef: smMasterRef, SlaveRef: smSlaveRef}
 		}
 	}

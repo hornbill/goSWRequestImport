@@ -58,7 +58,6 @@ var (
 	mutexServices          = &sync.Mutex{}
 	mutexSites             = &sync.Mutex{}
 	mutexTeams             = &sync.Mutex{}
-	wgRequest              sync.WaitGroup
 	reqPrefix              string
 	maxGoroutines          = 1
 	boolProcessAttachments bool
@@ -342,4 +341,9 @@ type xmlmcIndexListResponse struct {
 	MethodResult string      `xml:"status,attr"`
 	State        stateStruct `xml:"state"`
 	Indexes      []string    `xml:"params>indexStorage"`
+}
+type RequestDetails struct {
+	CallClass string
+	CallMap   map[string]interface{}
+	SwCallID  string
 }
