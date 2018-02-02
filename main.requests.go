@@ -40,16 +40,7 @@ func processCallData() {
 				callID = fmt.Sprintf("%s", callRecordCallref)
 			}
 
-			//currentCallRef := padCallRef(callID, "F", 7)
-
 			jobs <- RequestDetails{CallClass: mapGenericConf.CallClass, CallMap: callRecordArr, SwCallID: callID}
-
-			//boolCallLogged, hbCallRef := logNewCall(mapGenericConf.CallClass, callRecordArr, callID)
-			//if boolCallLogged {
-			//	logger(3, "[REQUEST LOGGED] Request logged successfully: "+hbCallRef+" from Supportworks call "+currentCallRef, false)
-			//} else {
-			//	logger(4, mapGenericConf.CallClass+" call log failed: "+currentCallRef+" - "+hbCallRef, false)
-			//}
 		}
 
 		close(jobs)
@@ -534,6 +525,7 @@ func logNewCall(jobs chan RequestDetails, wg sync.WaitGroup) {
 			counters.createdSkipped++
 			counters.Unlock()
 			espXmlmc.ClearParam()
+			wg.Done()
 			continue
 		}
 
@@ -542,6 +534,7 @@ func logNewCall(jobs chan RequestDetails, wg sync.WaitGroup) {
 		if boolCallLoggedOK == true && strNewCallRef != "" {
 			applyHistoricalUpdates(strNewCallRef, swCallID, espXmlmc)
 		}
+		wg.Done()
 		//return boolCallLoggedOK, strNewCallRef
 	}
 }
