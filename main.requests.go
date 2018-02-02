@@ -58,7 +58,6 @@ func logNewCall(jobs chan RequestDetails, wg sync.WaitGroup) {
 	espXmlmc, err := NewEspXmlmcSession()
 	if err != nil {
 		logger(4, "Could not connect to Hornbill Instance", false)
-		wg.Done()
 		return
 
 	}
