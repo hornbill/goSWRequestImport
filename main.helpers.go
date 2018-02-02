@@ -115,7 +115,6 @@ func logger(t int, s string, outputtoCLI bool) {
 			defer color.Unset()
 		}
 	}
-
 	if outputtoCLI {
 		fmt.Printf("%v \n", errorLogPrefix+s)
 	}

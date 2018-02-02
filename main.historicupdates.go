@@ -144,9 +144,9 @@ func applyHistoricalUpdates(newCallRef string, swCallRef string, espXmlmc *apiLi
 				//-- DEBUG XML TO LOG FILE
 				var XMLSTRING = espXmlmc.GetParam()
 				logger(1, "Request Historical Update XML "+XMLSTRING, false)
-				counters.Lock()
+				mutexCounters.Lock()
 				counters.createdSkipped++
-				counters.Unlock()
+				mutexCounters.Unlock()
 				espXmlmc.ClearParam()
 				return true
 			}

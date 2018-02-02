@@ -21,7 +21,7 @@ func processCallData() {
 		jobs := make(chan RequestDetails, maxGoroutines)
 
 		for w := 1; w <= maxGoroutines; w++ {
-			go logNewCall(jobs, wg)
+			go logNewCall(jobs, &wg)
 		}
 
 		for _, callRecord := range arrCallDetailsMaps {
@@ -53,7 +53,7 @@ func processCallData() {
 }
 
 //logNewCall - Function takes Supportworks call data in a map, and logs to Hornbill
-func logNewCall(jobs chan RequestDetails, wg sync.WaitGroup) {
+func logNewCall(jobs chan RequestDetails, wg *sync.WaitGroup) {
 
 	espXmlmc, err := NewEspXmlmcSession()
 	if err != nil {
@@ -361,17 +361,17 @@ func logNewCall(jobs chan RequestDetails, wg sync.WaitGroup) {
 
 			err := xml.Unmarshal([]byte(XMLCreate), &xmlRespon)
 			if err != nil {
-				counters.Lock()
+				mutexCounters.Lock()
 				counters.createdSkipped++
-				counters.Unlock()
+				mutexCounters.Unlock()
 				wg.Done()
 				logger(4, xmlmcErr.Error(), false)
 				continue
 			}
 			if xmlRespon.MethodResult != "ok" {
-				counters.Lock()
+				mutexCounters.Lock()
 				counters.createdSkipped++
-				counters.Unlock()
+				mutexCounters.Unlock()
 				boolCallLoggedOK = false
 				strNewCallRef = xmlRespon.State.ErrorRet
 			} else {
@@ -381,9 +381,9 @@ func logNewCall(jobs chan RequestDetails, wg sync.WaitGroup) {
 				arrCallsLogged[swCallID] = strNewCallRef
 				mutexArrCallsLogged.Unlock()
 
-				counters.Lock()
+				mutexCounters.Lock()
 				counters.created++
-				counters.Unlock()
+				mutexCounters.Unlock()
 				boolCallLoggedOK = true
 
 				//Now update the request to create the activity stream
@@ -520,9 +520,9 @@ func logNewCall(jobs chan RequestDetails, wg sync.WaitGroup) {
 			//-- DEBUG XML TO LOG FILE
 			var XMLSTRING = espXmlmc.GetParam()
 			logger(1, "Request Log XML "+XMLSTRING, false)
-			counters.Lock()
+			mutexCounters.Lock()
 			counters.createdSkipped++
-			counters.Unlock()
+			mutexCounters.Unlock()
 			espXmlmc.ClearParam()
 			wg.Done()
 			continue

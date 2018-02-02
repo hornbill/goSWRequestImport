@@ -9,7 +9,7 @@ import (
 )
 
 const (
-	version           = "1.4.4"
+	version           = "1.4.5"
 	appServiceManager = "com.hornbill.servicemanager"
 	//Disk Space Declarations
 	sizeKB float64 = 1 << (10 * 1)
@@ -54,6 +54,7 @@ var (
 	mutexBar               = &sync.Mutex{}
 	mutexCategories        = &sync.Mutex{}
 	mutexCloseCategories   = &sync.Mutex{}
+	mutexCounters          = &sync.Mutex{}
 	mutexCustomers         = &sync.Mutex{}
 	mutexPriorities        = &sync.Mutex{}
 	mutexServices          = &sync.Mutex{}

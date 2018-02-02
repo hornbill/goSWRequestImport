@@ -33,7 +33,7 @@ func processCallAssociations() {
 	jobs := make(chan refStruct, maxGoroutines)
 
 	for w := 1; w <= maxGoroutines; w++ {
-		go addAssocRecord(jobs, wg)
+		go addAssocRecord(jobs, &wg)
 	}
 
 	for rows.Next() {
@@ -62,7 +62,7 @@ func processCallAssociations() {
 }
 
 //addAssocRecord - given a Master Reference and a Slave Refernce, adds a call association record to Service Manager
-func addAssocRecord(jobs chan refStruct, wg sync.WaitGroup) {
+func addAssocRecord(jobs chan refStruct, wg *sync.WaitGroup) {
 
 	espXmlmc, err := NewEspXmlmcSession()
 	if err != nil {

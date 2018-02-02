@@ -1,3 +1,8 @@
+## 1.4.5 (February 2nd 2018)
+
+Features:
+- Improved multithreading peformance and memory usage
+
 ## 1.4.4 (December 12th 2017)
 
 Defect fix:
