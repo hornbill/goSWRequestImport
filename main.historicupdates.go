@@ -7,20 +7,13 @@ import (
 	"strconv"
 
 	"github.com/hornbill/goapiLib"
-	"github.com/hornbill/sqlx"
 )
 
 //applyHistoricalUpdates - takes call diary records from Supportworks, imports to Hornbill as Historical Updates
 func applyHistoricalUpdates(newCallRef string, swCallRef string, espXmlmc *apiLib.XmlmcInstStruct) bool {
 	//Connect to the JSON specified DB
-	db, err := sqlx.Open(appDBDriver, connStrAppDB)
-	if err != nil {
-		logger(4, " [DATABASE] Database Connection Error for Historical Updates: "+fmt.Sprintf("%v", err), false)
-		return false
-	}
-	defer db.Close()
 	//Check connection is open
-	err = db.Ping()
+	err := dbapp.Ping()
 	if err != nil {
 		logger(4, " [DATABASE] [PING] Database Connection Error for Historical Updates: "+fmt.Sprintf("%v", err), false)
 		return false
@@ -34,7 +27,7 @@ func applyHistoricalUpdates(newCallRef string, swCallRef string, espXmlmc *apiLi
 	logger(3, "[DATABASE] Diary Query: "+sqlDiaryQuery, false)
 	mutex.Unlock()
 	//Run Query
-	rows, err := db.Queryx(sqlDiaryQuery)
+	rows, err := dbapp.Queryx(sqlDiaryQuery)
 	if err != nil {
 		logger(4, " Database Query Error: "+fmt.Sprintf("%v", err), false)
 		return false

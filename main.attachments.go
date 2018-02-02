@@ -11,18 +11,10 @@ import (
 	"strconv"
 	"strings"
 	"unicode/utf8"
-
-	"github.com/hornbill/sqlx"
 )
 
 func processFileAttachments(swCallRef, smCallRef string) {
 
-	//logger(3, "Searching for file attachments within "+strconv.Itoa(len(arrCallsLogged))+" imported requests. Please wait...", true)
-
-	//bar := pb.StartNew(len(arrCallsLogged))
-	//for swCallRef, smCallRef := range arrCallsLogged {
-	//		bar.Increment()
-	//Check if there are file attachments for the imported request
 	requestAttachments := fileAttachmentData(swCallRef, smCallRef)
 	for i := 0; i < len(requestAttachments); i++ {
 		entityRequest := ""
@@ -108,14 +100,8 @@ func fileAttachmentData(swRequest, smRequest string) []fileAssocStruct {
 	intSwCallRef := getCallRefInt(swRequest)
 	var returnArray = make([]fileAssocStruct, 0)
 	//Connect to the JSON specified DB
-	db, err := sqlx.Open(cacheDBDriver, connStrSysDB)
-	if err != nil {
-		logger(4, "[DATABASE] Database Connection Error for Request File Attachments: "+fmt.Sprintf("%v", err), true)
-		return returnArray
-	}
-	defer db.Close()
 	//Check connection is open
-	err = db.Ping()
+	err := dbsys.Ping()
 	if err != nil {
 		logger(4, "[DATABASE] [PING] Database Connection Error for Request File Attachments: "+fmt.Sprintf("%v", err), true)
 		return returnArray
@@ -128,7 +114,7 @@ func fileAttachmentData(swRequest, smRequest string) []fileAssocStruct {
 	sqlFileQuery = sqlFileQuery + " FROM system_cfastore WHERE callref = " + intSwCallRef
 	//logger(3, "[DATABASE] Request File Attachments Query: "+sqlFileQuery, false)
 	//Run Query
-	rows, err := db.Queryx(sqlFileQuery)
+	rows, err := dbsys.Queryx(sqlFileQuery)
 	if err != nil {
 		logger(4, " Database Query Error: "+fmt.Sprintf("%v", err), true)
 		return returnArray

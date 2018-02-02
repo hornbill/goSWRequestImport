@@ -4,22 +4,13 @@ import (
 	"encoding/xml"
 	"fmt"
 	"sync"
-
-	"github.com/hornbill/sqlx"
 )
 
 //processCallAssociations - Get all records from swdata.cmn_rel_opencall_oc, process accordingly
 func processCallAssociations() {
 	logger(1, "Processing Request Associations, please wait...", true)
-	//Connect to the JSON specified DB
-	db, err := sqlx.Open(appDBDriver, connStrAppDB)
-	if err != nil {
-		logger(4, " [DATABASE] Database Connection Error for Request Associations: "+fmt.Sprintf("%v", err), false)
-		return
-	}
-	defer db.Close()
 	//Check connection is open
-	err = db.Ping()
+	err := dbapp.Ping()
 	if err != nil {
 		logger(4, " [DATABASE] [PING] Database Connection Error for Request Associations: "+fmt.Sprintf("%v", err), false)
 		return
@@ -31,7 +22,7 @@ func processCallAssociations() {
 	sqlDiaryQuery := swImportConf.RelatedRequestQuery
 	logger(3, "[DATABASE] Request Association Query: "+sqlDiaryQuery, false)
 	//Run Query
-	rows, err := db.Queryx(sqlDiaryQuery)
+	rows, err := dbapp.Queryx(sqlDiaryQuery)
 	if err != nil {
 		logger(4, " Database Query Error: "+fmt.Sprintf("%v", err), false)
 		return

@@ -71,14 +71,14 @@ func queryDBCallDetails(callClass, swCallClass, connString string) bool {
 		return false
 	}
 	//Connect to the JSON specified DB
-	db, err := sqlx.Open(appDBDriver, connString)
+	db2, err := sqlx.Open(appDBDriver, connString)
 	if err != nil {
 		logger(4, "[DATABASE] Database Connection Error: "+fmt.Sprintf("%v", err), true)
 		return false
 	}
-	defer db.Close()
+	defer db2.Close()
 	//Check connection is open
-	err = db.Ping()
+	err = db2.Ping()
 	if err != nil {
 		logger(4, "[DATABASE] [PING] Database Connection Error: "+fmt.Sprintf("%v", err), true)
 		return false
@@ -91,7 +91,7 @@ func queryDBCallDetails(callClass, swCallClass, connString string) bool {
 	logger(3, "[DATABASE] Query to retrieve "+callClass+" calls from Supportworks: "+sqlCallQuery, false)
 
 	//Run Query
-	rows, err := db.Queryx(sqlCallQuery)
+	rows, err := db2.Queryx(sqlCallQuery)
 	if err != nil {
 		logger(4, " Database Query Error: "+fmt.Sprintf("%v", err), true)
 		return false

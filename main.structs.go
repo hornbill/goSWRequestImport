@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/hornbill/goapiLib"
+	"github.com/hornbill/sqlx"
 )
 
 const (
@@ -61,6 +62,8 @@ var (
 	reqPrefix              string
 	maxGoroutines          = 1
 	boolProcessAttachments bool
+	dbapp                  *sqlx.DB
+	dbsys                  *sqlx.DB
 )
 
 // ----- Structures -----

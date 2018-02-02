@@ -11,6 +11,8 @@ import (
 	_ "github.com/hornbill/mysql"      //MySQL v4.1 to v5.x and MariaDB driver
 	//_ "github.com/hornbill/mysql320"   //MySQL v3.2.0 to v5 driver - Provides SWSQL (MySQL 4.0.16) support
 	_ "github.com/weave-lab/mysql320" //MySQL v3.2.0 to v5 driver - Provides SWSQL (MySQL 4.0.16) support
+
+	"github.com/hornbill/sqlx"
 )
 
 // main package
@@ -102,6 +104,22 @@ func main() {
 	//-- Build DB connection strings for sw_systemdb and swdata
 	connStrSysDB = buildConnectionString("cache")
 	connStrAppDB = buildConnectionString("app")
+
+	var dberr error
+	dbsys, dberr = sqlx.Open(cacheDBDriver, connStrSysDB)
+	if dberr != nil {
+		logger(4, "Could not open cache DB connection"+dberr.Error(), true)
+		return
+	}
+	defer dbsys.Close()
+
+	var db2err error
+	dbapp, db2err = sqlx.Open(cacheDBDriver, connStrAppDB)
+	if db2err != nil {
+		logger(4, "Could not open app DB connection"+db2err.Error(), true)
+		return
+	}
+	defer dbapp.Close()
 
 	//Get request type import config, process each in turn
 	for _, val := range swImportConf.RequestTypesToImport {
