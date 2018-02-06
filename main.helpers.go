@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"regexp"
 	"strconv"
 	"strings"
 	"time"
@@ -159,6 +160,22 @@ func convExtendedColName(oldColName string) string {
 	return "h_custom_" + strNewColID
 }
 
+func getSupportworksIntRef(swCallRef string) int {
+	var returnRef int
+	re := regexp.MustCompile("[0-9]{1,}")
+	intRef := re.FindAllString(swCallRef, 1)
+	if intRef != nil {
+		intRefSlice := strings.Trim(intRef[0], "0")
+		intRefInt, err := strconv.ParseInt(intRefSlice, 10, 0)
+		if err != nil {
+			logger(4, "Could not convert Supportworks reference number: "+fmt.Sprintf("%v", err), false)
+		} else {
+			returnRef = int(intRefInt)
+		}
+	}
+	return returnRef
+}
+
 //confirmResponse - prompts user, expects a fuzzy yes or no response, does not continue until this is given
 /*func confirmResponse() bool {
 	var cmdResponse string
@@ -201,6 +218,8 @@ func parseFlags() {
 	flag.BoolVar(&configDryRun, "dryrun", false, "Dump import XML to log instead of creating requests")
 	flag.StringVar(&configMaxRoutines, "concurrent", "1", "Maximum number of requests to import concurrently.")
 	flag.BoolVar(&boolProcessAttachments, "attachments", false, "Import attachemnts without prompting.")
+	flag.StringVar(&cpuprofile, "cpuprofile", "", "Profile CPU Usage to file.")
+	flag.StringVar(&memprofile, "memprofile", "", "Profile Memory Usage to file.")
 	flag.Parse()
 }
 

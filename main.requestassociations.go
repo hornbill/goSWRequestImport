@@ -3,7 +3,6 @@ package main
 import (
 	"encoding/xml"
 	"fmt"
-	"sync"
 )
 
 //processCallAssociations - Get all records from swdata.cmn_rel_opencall_oc, process accordingly
@@ -28,22 +27,12 @@ func processCallAssociations() {
 		return
 	}
 
-	var wg sync.WaitGroup
-
-	jobs := make(chan refStruct, maxGoroutines)
-
-	for w := 1; w <= maxGoroutines; w++ {
-		go addAssocRecord(jobs, &wg)
-	}
-
 	for rows.Next() {
 		var requestRels reqRelStruct
-		wg.Add(1)
 
 		errDataMap := rows.StructScan(&requestRels)
 		if errDataMap != nil {
 			logger(4, " Data Mapping Error: "+fmt.Sprintf("%v", errDataMap), false)
-			wg.Done()
 			return
 		}
 		smMasterRef, mrOK := arrCallsLogged[requestRels.MasterRef]
@@ -51,54 +40,45 @@ func processCallAssociations() {
 
 		if mrOK == true && smMasterRef != "" && srOK == true && smSlaveRef != "" {
 			//We have Master and Slave calls matched in the SM database
-			jobs <- refStruct{MasterRef: smMasterRef, SlaveRef: smSlaveRef}
+			jobs := refStruct{MasterRef: smMasterRef, SlaveRef: smSlaveRef}
+			addAssocRecord(jobs)
 		}
 	}
-
-	close(jobs)
-	wg.Wait()
 
 	logger(1, "Request Association Processing Complete", true)
 }
 
 //addAssocRecord - given a Master Reference and a Slave Refernce, adds a call association record to Service Manager
-func addAssocRecord(jobs chan refStruct, wg *sync.WaitGroup) {
+func addAssocRecord(assoc refStruct) {
 
 	espXmlmc, err := NewEspXmlmcSession()
 	if err != nil {
 		logger(4, "Could not connect to Hornbill Instance", false)
-		wg.Done()
 		return
 
 	}
 
-	for asset := range jobs {
-		espXmlmc.SetParam("entityId", asset.MasterRef)
-		espXmlmc.SetParam("entityName", "Requests")
-		espXmlmc.SetParam("linkedEntityId", asset.SlaveRef)
-		espXmlmc.SetParam("linkedEntityName", "Requests")
-		espXmlmc.SetParam("updateTimeline", "true")
-		espXmlmc.SetParam("visibility", "trustedGuest")
-		XMLUpdate, xmlmcErr := espXmlmc.Invoke("apps/com.hornbill.servicemanager/RelationshipEntities", "add")
-		if xmlmcErr != nil {
-			//		log.Fatal(xmlmcErr)
-			logger(4, "Unable to create Request Association between ["+asset.MasterRef+"] and ["+asset.SlaveRef+"] :"+fmt.Sprintf("%v", xmlmcErr), false)
-			wg.Done()
-			return
-		}
-		var xmlRespon xmlmcResponse
-		errXMLMC := xml.Unmarshal([]byte(XMLUpdate), &xmlRespon)
-		if errXMLMC != nil {
-			logger(4, "Unable to read response from Hornbill instance for Request Association between ["+asset.MasterRef+"] and ["+asset.SlaveRef+"] :"+fmt.Sprintf("%v", errXMLMC), false)
-			wg.Done()
-			return
-		}
-		if xmlRespon.MethodResult != "ok" {
-			logger(5, "Unable to add Request Association between ["+asset.MasterRef+"] and ["+asset.SlaveRef+"] : "+xmlRespon.State.ErrorRet, false)
-			wg.Done()
-			return
-		}
-		logger(1, "Request Association Success between ["+asset.MasterRef+"] and ["+asset.SlaveRef+"]", false)
-		wg.Done()
+	espXmlmc.SetParam("entityId", assoc.MasterRef)
+	espXmlmc.SetParam("entityName", "Requests")
+	espXmlmc.SetParam("linkedEntityId", assoc.SlaveRef)
+	espXmlmc.SetParam("linkedEntityName", "Requests")
+	espXmlmc.SetParam("updateTimeline", "true")
+	espXmlmc.SetParam("visibility", "trustedGuest")
+	XMLUpdate, xmlmcErr := espXmlmc.Invoke("apps/com.hornbill.servicemanager/RelationshipEntities", "add")
+	if xmlmcErr != nil {
+		//		log.Fatal(xmlmcErr)
+		logger(4, "Unable to create Request Association between ["+assoc.MasterRef+"] and ["+assoc.SlaveRef+"] :"+fmt.Sprintf("%v", xmlmcErr), false)
+		return
 	}
+	var xmlRespon xmlmcResponse
+	errXMLMC := xml.Unmarshal([]byte(XMLUpdate), &xmlRespon)
+	if errXMLMC != nil {
+		logger(4, "Unable to read response from Hornbill instance for Request Association between ["+assoc.MasterRef+"] and ["+assoc.SlaveRef+"] :"+fmt.Sprintf("%v", errXMLMC), false)
+		return
+	}
+	if xmlRespon.MethodResult != "ok" {
+		logger(5, "Unable to add Request Association between ["+assoc.MasterRef+"] and ["+assoc.SlaveRef+"] : "+xmlRespon.State.ErrorRet, false)
+		return
+	}
+	logger(1, "Request Association Success between ["+assoc.MasterRef+"] and ["+assoc.SlaveRef+"]", false)
 }

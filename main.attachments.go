@@ -11,7 +11,20 @@ import (
 	"strconv"
 	"strings"
 	"unicode/utf8"
+
+	"github.com/hornbill/pb"
 )
+
+func processAttachments() {
+	logger(1, "Processing File Attachments, please wait...", true)
+	bar := pb.StartNew(len(arrCallsLogged))
+	for swCallID, smCallID := range arrCallsLogged {
+		//Add file attachments to request
+		processFileAttachments(swCallID, smCallID)
+		bar.Increment()
+	}
+	bar.FinishPrint("File Attachment Import Complete")
+}
 
 func processFileAttachments(swCallRef, smCallRef string) {
 
@@ -20,7 +33,6 @@ func processFileAttachments(swCallRef, smCallRef string) {
 		entityRequest := ""
 		fileRecord := requestAttachments[i]
 		fileRecord.SmCallRef = smCallRef
-		//fmt.Println(fileRecord)
 		if fileRecord.UpdateID == "999999999" {
 			entityRequest = "Requests"
 		} else {

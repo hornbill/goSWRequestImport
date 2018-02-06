@@ -9,7 +9,7 @@ import (
 )
 
 const (
-	version           = "1.4.5"
+	version           = "1.4.6"
 	appServiceManager = "com.hornbill.servicemanager"
 	//Disk Space Declarations
 	sizeKB float64 = 1 << (10 * 1)
@@ -31,6 +31,8 @@ var (
 	configMaxRoutines      string
 	connStrSysDB           string
 	connStrAppDB           string
+	cpuprofile             string
+	memprofile             string
 	espXmlmc               *apiLib.XmlmcInstStruct
 	counters               counterTypeStruct
 	mapGenericConf         swCallConfStruct
@@ -346,8 +348,16 @@ type xmlmcIndexListResponse struct {
 	State        stateStruct `xml:"state"`
 	Indexes      []string    `xml:"params>indexStorage"`
 }
+
+//RequestDetails struct for chan
 type RequestDetails struct {
 	CallClass string
 	CallMap   map[string]interface{}
 	SwCallID  string
+}
+
+//RequestReferences struct for chan
+type RequestReferences struct {
+	SmCallID string
+	SwCallID string
 }

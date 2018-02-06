@@ -67,7 +67,7 @@ func logNewCall(jobs chan RequestDetails, wg *sync.WaitGroup) {
 		callMap := asset.CallMap
 		swCallID := asset.SwCallID
 
-		boolCallLoggedOK := false
+		//boolCallLoggedOK := false
 		strNewCallRef := ""
 		strStatus := ""
 		boolOnHoldRequest := false
@@ -372,7 +372,7 @@ func logNewCall(jobs chan RequestDetails, wg *sync.WaitGroup) {
 				mutexCounters.Lock()
 				counters.createdSkipped++
 				mutexCounters.Unlock()
-				boolCallLoggedOK = false
+				//boolCallLoggedOK = false
 				strNewCallRef = xmlRespon.State.ErrorRet
 			} else {
 				strNewCallRef = xmlRespon.RequestID
@@ -384,7 +384,7 @@ func logNewCall(jobs chan RequestDetails, wg *sync.WaitGroup) {
 				mutexCounters.Lock()
 				counters.created++
 				mutexCounters.Unlock()
-				boolCallLoggedOK = true
+				//boolCallLoggedOK = true
 
 				//Now update the request to create the activity stream
 				espXmlmc.SetParam("socialObjectRef", "urn:sys:entity:"+appServiceManager+":Requests:"+strNewCallRef)
@@ -512,9 +512,6 @@ func logNewCall(jobs chan RequestDetails, wg *sync.WaitGroup) {
 						logger(4, "Unable to place request on hold ["+strNewCallRef+"] : "+xmlRespon.State.ErrorRet, false)
 					}
 				}
-
-				//Add file attachments to request
-				processFileAttachments(swCallID, strNewCallRef)
 			}
 		} else {
 			//-- DEBUG XML TO LOG FILE
@@ -530,9 +527,9 @@ func logNewCall(jobs chan RequestDetails, wg *sync.WaitGroup) {
 
 		//-- If request logged successfully :
 		//Get the Call Diary Updates from Supportworks and build the Historical Updates against the SM request
-		if boolCallLoggedOK == true && strNewCallRef != "" {
-			applyHistoricalUpdates(strNewCallRef, swCallID, espXmlmc)
-		}
+		//if boolCallLoggedOK == true && strNewCallRef != "" {
+		//		applyHistoricalUpdates(strNewCallRef, swCallID, espXmlmc)
+		//	}
 		wg.Done()
 		//return boolCallLoggedOK, strNewCallRef
 	}

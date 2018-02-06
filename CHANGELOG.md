@@ -1,3 +1,8 @@
+## 1.4.6 (February 6th 2018)
+
+Features:
+- Further improved memory usage
+
 ## 1.4.5 (February 2nd 2018)
 
 Features:
