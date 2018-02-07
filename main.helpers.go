@@ -165,7 +165,7 @@ func getSupportworksIntRef(swCallRef string) int {
 	re := regexp.MustCompile("[0-9]{1,}")
 	intRef := re.FindAllString(swCallRef, 1)
 	if intRef != nil {
-		intRefSlice := strings.Trim(intRef[0], "0")
+		intRefSlice := strings.TrimLeft(intRef[0], "0")
 		intRefInt, err := strconv.ParseInt(intRefSlice, 10, 0)
 		if err != nil {
 			logger(4, "Could not convert Supportworks reference number: "+fmt.Sprintf("%v", err), false)

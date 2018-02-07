@@ -50,7 +50,6 @@ func applyHistoricalUpdates(jobs chan RequestReferences, wg *sync.WaitGroup) {
 
 		smCallRef := request.SmCallID
 		swCallRef := request.SwCallID
-		intSwCallRef := getSupportworksIntRef(swCallRef)
 		err := dbapp.Ping()
 		if err != nil {
 			logger(4, " [DATABASE] [PING] Database Connection Error for Historical Updates: "+fmt.Sprintf("%v", err), false)
@@ -62,7 +61,7 @@ func applyHistoricalUpdates(jobs chan RequestReferences, wg *sync.WaitGroup) {
 		logger(3, "[DATABASE] Running query for Historical Updates of call "+swCallRef+". Please wait...", false)
 		//build query
 		sqlDiaryQuery := "SELECT updatetimex, repid, groupid, udsource, udcode, udtype, updatetxt, udindex, timespent "
-		sqlDiaryQuery = sqlDiaryQuery + " FROM updatedb WHERE callref = " + strconv.Itoa(intSwCallRef)
+		sqlDiaryQuery = sqlDiaryQuery + " FROM updatedb WHERE callref = " + swCallRef
 		logger(3, "[DATABASE] Diary Query: "+sqlDiaryQuery, false)
 		mutex.Unlock()
 		//Run Query

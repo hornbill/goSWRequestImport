@@ -1,3 +1,8 @@
+## 1.4.7 (February 7th 2018)
+
+Defect fix:
+- Fixed issue with call diary entries sometimes assigning to incorrect request
+
 ## 1.4.6 (February 6th 2018)
 
 Features:
