@@ -22,7 +22,7 @@
   },
   "CustomerType": "0",
   "SMProfileCodeSeperator": "-",
-  "RelatedRequestQuery":"(SELECT fk_callref_m AS parentRequest, fk_callref_s AS childRequest from cmn_rel_opencall_oc) UNION (SELECT bpm_parentcallref AS parentRequest, callref AS childRequest FROM opencall WHERE callclass = 'B.P Task') ",
+  "RelatedRequestQuery":"(SELECT ocm.h_formattedcallref AS parentRequest, ocs.h_formattedcallref AS childRequest from cmn_rel_opencall_oc rel LEFT JOIN opencall ocm ON rel.fk_callref_m = ocm.callref LEFT JOIN opencall ocs ON rel.fk_callref_s = ocs.callref) UNION (SELECT bpm_parentcallref AS parentRequest, h_formattedcallref AS childRequest FROM opencall WHERE callclass = 'B.P Task') ",
   "RequestTypesToImport": 
   [
     {
@@ -79,9 +79,9 @@
       },
       "AdditionalFieldMapping":{
         "h_firsttimefix":"",
-        "h_custom_a":"Custom Data",
-        "h_custom_b":"[itsm_title]",
-        "h_custom_c":"[updatetxt]",
+        "h_custom_a":"",
+        "h_custom_b":"",
+        "h_custom_c":"",
         "h_custom_d":"",
         "h_custom_e":"",
         "h_custom_f":"",
@@ -156,9 +156,9 @@
       },
       "AdditionalFieldMapping":{
         "h_firsttimefix":"",
-        "h_custom_a":"Custom Data",
-        "h_custom_b":"[itsm_title]",
-        "h_custom_c":"[updatetxt]",
+        "h_custom_a":"",
+        "h_custom_b":"",
+        "h_custom_c":"",
         "h_custom_d":"",
         "h_custom_e":"",
         "h_custom_f":"",
