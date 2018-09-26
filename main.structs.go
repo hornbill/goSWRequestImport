@@ -9,7 +9,7 @@ import (
 )
 
 const (
-	version           = "1.4.7"
+	version           = "1.4.8"
 	appServiceManager = "com.hornbill.servicemanager"
 	//Disk Space Declarations
 	sizeKB float64 = 1 << (10 * 1)

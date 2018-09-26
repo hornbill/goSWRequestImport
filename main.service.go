@@ -53,11 +53,13 @@ func searchService(serviceName string) (bool, int) {
 	espXmlmc.SetParam("entity", "Services")
 	espXmlmc.SetParam("matchScope", "all")
 	espXmlmc.OpenElement("searchFilter")
-	espXmlmc.SetParam("h_servicename", serviceName)
+	//espXmlmc.SetParam("h_servicename", serviceName)
+	espXmlmc.SetParam("column", "h_servicename")
+	espXmlmc.SetParam("value", serviceName)
 	espXmlmc.CloseElement("searchFilter")
 	espXmlmc.SetParam("maxResults", "1")
 
-	XMLServiceSearch, xmlmcErr := espXmlmc.Invoke("data", "entityBrowseRecords")
+	XMLServiceSearch, xmlmcErr := espXmlmc.Invoke("data", "entityBrowseRecords2")
 	if xmlmcErr != nil {
 		logger(4, "Unable to Search for Service: "+fmt.Sprintf("%v", xmlmcErr), false)
 		//log.Fatal(xmlmcErr)
