@@ -45,8 +45,8 @@ When running the import tool, after the call records are imported, you will rece
 * Open Command Line Prompt as Administrator
 * Change Directory to the folder containing the extracted files `C:\sw_call_import\`
 * Run the command relevant to the computer you are running this on:
-* - For 32 Bit Windows Machines : sw_call_import_w32.exe -dryrun=true
-* - For 64 Bit Windows Machines : sw_call_import_w64.exe -dryrun=true
+* - For 32 Bit Windows Machines : goSWRequestImport_x32.exe -dryrun=true
+* - For 64 Bit Windows Machines : goSWRequestImport_x64.exe -dryrun=true
 
 # Configuration
 
@@ -746,7 +746,7 @@ Command Line Parameters
 # Testing
 If you run the application with the argument dryrun=true then no requests will be logged - the XML used to raise requests will instead be saved in to the log file so you can ensure the data mappings are correct before running the import.
 
-'sw_call_import.exe -dryrun=true'
+'goSWRequestImport_x64.exe -dryrun=true'
 
 # Logging
 All Logging output is saved in the log directory in the same directory as the executable the file name contains the date and time the import was run 'SW_Call_Import_2015-11-06T14-26-13Z.log'
