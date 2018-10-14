@@ -1,3 +1,16 @@
+## 1.5.0 (October 14th 2018)
+
+Features:
+- Performance improvements
+- Memory usage improvements
+- Reduction in the number of HTTP sessions used
+- No longer required to provide instance zone when running tool
+- Logging improvements
+- Historic Updates and File Attachments are now processed for each request rather than at the end, improving log readability
+
+Defect fix:
+- Fixed memory leak
+
 ## 1.4.7 (February 7th 2018)
 
 Defect fix:

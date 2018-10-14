@@ -4,19 +4,13 @@ import (
 	"sync"
 	"time"
 
-	"github.com/hornbill/goapiLib"
+	"github.com/hornbill/goApiLib"
 	"github.com/hornbill/sqlx"
 )
 
 const (
-	version           = "1.4.7"
+	version           = "1.5.0"
 	appServiceManager = "com.hornbill.servicemanager"
-	//Disk Space Declarations
-	sizeKB float64 = 1 << (10 * 1)
-	sizeMB float64 = 1 << (10 * 2)
-	sizeGB float64 = 1 << (10 * 3)
-	sizeTB float64 = 1 << (10 * 4)
-	sizePB float64 = 1 << (10 * 5)
 )
 
 var (
@@ -25,14 +19,13 @@ var (
 	arrCallsLogged         = make(map[string]string)
 	arrCallDetailsMaps     = make([]map[string]interface{}, 0)
 	boolConfLoaded         bool
+	bufferMutex            = &sync.Mutex{}
 	configFileName         string
-	configZone             string
 	configDryRun           bool
+	configDebug            bool
 	configMaxRoutines      string
 	connStrSysDB           string
 	connStrAppDB           string
-	cpuprofile             string
-	memprofile             string
 	espXmlmc               *apiLib.XmlmcInstStruct
 	counters               counterTypeStruct
 	mapGenericConf         swCallConfStruct
@@ -99,7 +92,6 @@ type hbConfStruct struct {
 	InstanceID string
 	UserName   string
 	Password   string
-	URL        string
 }
 type refStruct struct {
 	MasterRef string

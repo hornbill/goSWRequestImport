@@ -1,28 +1,31 @@
 package main
 
 import (
+	"bytes"
 	"encoding/xml"
 	"fmt"
 	"strconv"
 	"strings"
+
+	"github.com/hornbill/goApiLib"
 )
 
 //getCallServiceID takes the Call Record and returns a correct Service ID if one exists on the Instance
-func getCallServiceID(swService string) string {
+func getCallServiceID(swService string, espXmlmc *apiLib.XmlmcInstStruct, buffer *bytes.Buffer) string {
 	serviceID := ""
 	serviceName := ""
 	if swImportConf.ServiceMapping[swService] != nil {
 		serviceName = fmt.Sprintf("%s", swImportConf.ServiceMapping[swService])
 
 		if serviceName != "" {
-			serviceID = getServiceID(serviceName)
+			serviceID = getServiceID(serviceName, espXmlmc, buffer)
 		}
 	}
 	return serviceID
 }
 
 //getServiceID takes a Service Name string and returns a correct Service ID if one exists in the cache or on the Instance
-func getServiceID(serviceName string) string {
+func getServiceID(serviceName string, espXmlmc *apiLib.XmlmcInstStruct, buffer *bytes.Buffer) string {
 	serviceID := ""
 	if serviceName != "" {
 		serviceIsInCache, ServiceIDCache := recordInCache(serviceName, "Service")
@@ -30,7 +33,7 @@ func getServiceID(serviceName string) string {
 		if serviceIsInCache {
 			serviceID = ServiceIDCache
 		} else {
-			serviceIsOnInstance, ServiceIDInstance := searchService(serviceName)
+			serviceIsOnInstance, ServiceIDInstance := searchService(serviceName, espXmlmc, buffer)
 			//-- If Returned set output
 			if serviceIsOnInstance {
 				serviceID = strconv.Itoa(ServiceIDInstance)
@@ -41,13 +44,9 @@ func getServiceID(serviceName string) string {
 }
 
 // seachService -- Function to check if passed-through service name is on the instance
-func searchService(serviceName string) (bool, int) {
+func searchService(serviceName string, espXmlmc *apiLib.XmlmcInstStruct, buffer *bytes.Buffer) (bool, int) {
 	boolReturn := false
 	intReturn := 0
-	espXmlmc, err := NewEspXmlmcSession()
-	if err != nil {
-		return false, 0
-	}
 	//-- ESP Query for service
 	espXmlmc.SetParam("application", appServiceManager)
 	espXmlmc.SetParam("entity", "Services")
@@ -59,18 +58,18 @@ func searchService(serviceName string) (bool, int) {
 
 	XMLServiceSearch, xmlmcErr := espXmlmc.Invoke("data", "entityBrowseRecords")
 	if xmlmcErr != nil {
-		logger(4, "Unable to Search for Service: "+fmt.Sprintf("%v", xmlmcErr), false)
+		buffer.WriteString(loggerGen(4, "Unable to Search for Service: "+fmt.Sprintf("%v", xmlmcErr)))
 		//log.Fatal(xmlmcErr)
 		return boolReturn, intReturn
 	}
 	var xmlRespon xmlmcServiceListResponse
 
-	err = xml.Unmarshal([]byte(XMLServiceSearch), &xmlRespon)
+	err := xml.Unmarshal([]byte(XMLServiceSearch), &xmlRespon)
 	if err != nil {
-		logger(4, "Unable to Search for Service: "+fmt.Sprintf("%v", err), false)
+		buffer.WriteString(loggerGen(4, "Unable to Search for Service: "+fmt.Sprintf("%v", err)))
 	} else {
 		if xmlRespon.MethodResult != "ok" {
-			logger(5, "Unable to Search for Service: "+xmlRespon.State.ErrorRet, false)
+			buffer.WriteString(loggerGen(5, "Unable to Search for Service: "+xmlRespon.State.ErrorRet))
 		} else {
 			//-- Check Response
 			if xmlRespon.ServiceName != "" {

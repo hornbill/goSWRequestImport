@@ -1,13 +1,16 @@
 package main
 
 import (
+	"bytes"
 	"encoding/xml"
 	"fmt"
 	"strings"
+
+	"github.com/hornbill/goApiLib"
 )
 
 //getCallCategoryID takes the Call Record and returns a correct Category ID if one exists on the Instance
-func getCallCategoryID(callMap map[string]interface{}, categoryGroup string) (string, string) {
+func getCallCategoryID(callMap map[string]interface{}, categoryGroup string, espXmlmc *apiLib.XmlmcInstStruct, buffer *bytes.Buffer) (string, string) {
 	categoryID := ""
 	categoryString := ""
 	categoryNameMapping := ""
@@ -37,13 +40,13 @@ func getCallCategoryID(callMap map[string]interface{}, categoryGroup string) (st
 		}
 	}
 	if categoryCode != "" {
-		categoryID, categoryString = getCategoryID(categoryCode, categoryGroup)
+		categoryID, categoryString = getCategoryID(categoryCode, categoryGroup, espXmlmc, buffer)
 	}
 	return categoryID, categoryString
 }
 
 //getCategoryID takes a Category Code string and returns a correct Category ID if one exists in the cache or on the Instance
-func getCategoryID(categoryCode, categoryGroup string) (string, string) {
+func getCategoryID(categoryCode, categoryGroup string, espXmlmc *apiLib.XmlmcInstStruct, buffer *bytes.Buffer) (string, string) {
 
 	categoryID := ""
 	categoryString := ""
@@ -54,7 +57,7 @@ func getCategoryID(categoryCode, categoryGroup string) (string, string) {
 			categoryID = CategoryIDCache
 			categoryString = CategoryNameCache
 		} else {
-			categoryIsOnInstance, CategoryIDInstance, CategoryStringInstance := searchCategory(categoryCode, categoryGroup)
+			categoryIsOnInstance, CategoryIDInstance, CategoryStringInstance := searchCategory(categoryCode, categoryGroup, espXmlmc, buffer)
 			//-- If Returned set output
 			if categoryIsOnInstance {
 				categoryID = CategoryIDInstance
@@ -66,12 +69,7 @@ func getCategoryID(categoryCode, categoryGroup string) (string, string) {
 }
 
 // seachCategory -- Function to check if passed-through support category name is on the instance
-func searchCategory(categoryCode, categoryGroup string) (bool, string, string) {
-	espXmlmc, sessErr := NewEspXmlmcSession()
-	if sessErr != nil {
-		logger(4, "Unable to attach to XMLMC session to search category.", false)
-		return false, "", ""
-	}
+func searchCategory(categoryCode, categoryGroup string, espXmlmc *apiLib.XmlmcInstStruct, buffer *bytes.Buffer) (bool, string, string) {
 	boolReturn := false
 	idReturn := ""
 	strReturn := ""
@@ -80,23 +78,23 @@ func searchCategory(categoryCode, categoryGroup string) (bool, string, string) {
 	espXmlmc.SetParam("code", categoryCode)
 	XMLCategorySearch, xmlmcErr := espXmlmc.Invoke("data", "profileCodeLookup")
 	if xmlmcErr != nil {
-		logger(4, "XMLMC API Invoke Failed for "+categoryGroup+" Category ["+categoryCode+"]: "+fmt.Sprintf("%v", xmlmcErr), false)
+		buffer.WriteString(loggerGen(4, "XMLMC API Invoke Failed for "+categoryGroup+" Category ["+categoryCode+"]: "+fmt.Sprintf("%v", xmlmcErr)))
 		return boolReturn, idReturn, strReturn
 	}
 	var xmlRespon xmlmcCategoryListResponse
 
 	err := xml.Unmarshal([]byte(XMLCategorySearch), &xmlRespon)
 	if err != nil {
-		logger(4, "Unable to unmarshal response for "+categoryGroup+" Category: "+fmt.Sprintf("%v", err), false)
+		buffer.WriteString(loggerGen(4, "Unable to unmarshal response for "+categoryGroup+" Category: "+fmt.Sprintf("%v", err)))
 	} else {
 		if xmlRespon.MethodResult != "ok" {
-			logger(5, "Unable to Search for "+categoryGroup+" Category ["+categoryCode+"]: ["+fmt.Sprintf("%v", xmlRespon.MethodResult)+"] "+xmlRespon.State.ErrorRet, false)
+			buffer.WriteString(loggerGen(5, "Unable to Search for "+categoryGroup+" Category ["+categoryCode+"]: ["+fmt.Sprintf("%v", xmlRespon.MethodResult)+"] "+xmlRespon.State.ErrorRet))
 		} else {
 			//-- Check Response
 			if xmlRespon.CategoryName != "" {
 				strReturn = xmlRespon.CategoryName
 				idReturn = xmlRespon.CategoryID
-				logger(3, "[CATEGORY] [SUCCESS] Methodcall result OK for "+categoryGroup+" Category ["+categoryCode+"] : ["+strReturn+"]", false)
+				buffer.WriteString(loggerGen(3, "[CATEGORY] [SUCCESS] Methodcall result OK for "+categoryGroup+" Category ["+categoryCode+"] : ["+strReturn+"]"))
 				boolReturn = true
 				//-- Add Category to Cache
 				var newCategoryForCache categoryListStruct
@@ -115,7 +113,7 @@ func searchCategory(categoryCode, categoryGroup string) (bool, string, string) {
 					mutexCloseCategories.Unlock()
 				}
 			} else {
-				logger(5, "[CATEGORY] Methodcall result OK for "+categoryGroup+" Category ["+categoryCode+"] but category name blank: ["+xmlRespon.CategoryID+"] ["+xmlRespon.CategoryName+"]", false)
+				buffer.WriteString(loggerGen(5, "[CATEGORY] Methodcall result OK for "+categoryGroup+" Category ["+categoryCode+"] but category name blank: ["+xmlRespon.CategoryID+"] ["+xmlRespon.CategoryName+"]"))
 			}
 		}
 	}

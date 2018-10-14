@@ -48,6 +48,34 @@ func loadConfig() (swImportConfStruct, bool) {
 	//-- Return New Config
 	return edbConf, boolLoadConf
 }
+func loggerGen(t int, s string) string {
+
+	var errorLogPrefix = ""
+	//-- Create Log Entry
+	switch t {
+	case 1:
+		errorLogPrefix = "[DEBUG] "
+	case 2:
+		errorLogPrefix = "[MESSAGE] "
+	case 3:
+		errorLogPrefix = ""
+	case 4:
+		errorLogPrefix = "[ERROR] "
+	case 5:
+		errorLogPrefix = "[WARNING] "
+	}
+	return errorLogPrefix + s + "\n\r"
+}
+func loggerWriteBuffer(s string) {
+	if s != "" {
+		logLines := strings.Split(s, "\n\r")
+		for _, line := range logLines {
+			if line != "" {
+				logger(0, line, false)
+			}
+		}
+	}
+}
 
 // logger -- function to append to the current log file
 func logger(t int, s string, outputtoCLI bool) {
@@ -81,6 +109,7 @@ func logger(t int, s string, outputtoCLI bool) {
 	var errorLogPrefix string
 	//-- Create Log Entry
 	switch t {
+	case 0:
 	case 1:
 		errorLogPrefix = "[DEBUG] "
 		if outputtoCLI {
@@ -176,50 +205,13 @@ func getSupportworksIntRef(swCallRef string) int {
 	return returnRef
 }
 
-//confirmResponse - prompts user, expects a fuzzy yes or no response, does not continue until this is given
-/*func confirmResponse() bool {
-	var cmdResponse string
-	_, errResponse := fmt.Scanln(&cmdResponse)
-	if errResponse != nil {
-		log.Fatal(errResponse)
-	}
-	if cmdResponse == "y" || cmdResponse == "yes" || cmdResponse == "Y" || cmdResponse == "Yes" || cmdResponse == "YES" {
-		return true
-	} else if cmdResponse == "n" || cmdResponse == "no" || cmdResponse == "N" || cmdResponse == "No" || cmdResponse == "NO" {
-		return false
-	} else {
-		color.Red("Please enter yes or no to continue:")
-		return confirmResponse()
-	}
-}*/
-
-//convFloattoSizeStr - takes given float64 value, returns a human readable storage capacity string
-/*func convFloattoSizeStr(floatNum float64) (strReturn string) {
-	if floatNum >= sizePB {
-		strReturn = fmt.Sprintf("%.2fPB", floatNum/sizePB)
-	} else if floatNum >= sizeTB {
-		strReturn = fmt.Sprintf("%.2fTB", floatNum/sizeTB)
-	} else if floatNum >= sizeGB {
-		strReturn = fmt.Sprintf("%.2fGB", floatNum/sizeGB)
-	} else if floatNum >= sizeMB {
-		strReturn = fmt.Sprintf("%.2fMB", floatNum/sizeMB)
-	} else if floatNum >= sizeKB {
-		strReturn = fmt.Sprintf("%.2fKB", floatNum/sizeKB)
-	} else {
-		strReturn = fmt.Sprintf("%vB", int(floatNum))
-	}
-	return
-}*/
-
 //parseFlags - grabs and parses command line flags
 func parseFlags() {
 	flag.StringVar(&configFileName, "file", "conf.json", "Name of the configuration file to load")
-	flag.StringVar(&configZone, "zone", "eur", "Override the default Zone the instance sits in")
 	flag.BoolVar(&configDryRun, "dryrun", false, "Dump import XML to log instead of creating requests")
+	flag.BoolVar(&configDebug, "debug", false, "Additional logging for debugging.")
 	flag.StringVar(&configMaxRoutines, "concurrent", "1", "Maximum number of requests to import concurrently.")
 	flag.BoolVar(&boolProcessAttachments, "attachments", false, "Import attachemnts without prompting.")
-	flag.StringVar(&cpuprofile, "cpuprofile", "", "Profile CPU Usage to file.")
-	flag.StringVar(&memprofile, "memprofile", "", "Profile Memory Usage to file.")
 	flag.Parse()
 }
 

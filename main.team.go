@@ -1,26 +1,29 @@
 package main
 
 import (
+	"bytes"
 	"encoding/xml"
 	"fmt"
 	"strings"
+
+	"github.com/hornbill/goApiLib"
 )
 
 //getCallTeamID takes the Call Record and returns a correct Team ID if one exists on the Instance
-func getCallTeamID(swTeamID string) (string, string) {
+func getCallTeamID(swTeamID string, espXmlmc *apiLib.XmlmcInstStruct, buffer *bytes.Buffer) (string, string) {
 	teamID := ""
 	teamName := ""
 	if swImportConf.TeamMapping[swTeamID] != nil {
 		teamName = fmt.Sprintf("%s", swImportConf.TeamMapping[swTeamID])
 		if teamName != "" {
-			teamID = getTeamID(teamName)
+			teamID = getTeamID(teamName, espXmlmc, buffer)
 		}
 	}
 	return teamID, teamName
 }
 
 //getTeamID takes a Team Name string and returns a correct Team ID if one exists in the cache or on the Instance
-func getTeamID(teamName string) string {
+func getTeamID(teamName string, espXmlmc *apiLib.XmlmcInstStruct, buffer *bytes.Buffer) string {
 	teamID := ""
 	if teamName != "" {
 		teamIsInCache, TeamIDCache := recordInCache(teamName, "Team")
@@ -28,7 +31,7 @@ func getTeamID(teamName string) string {
 		if teamIsInCache {
 			teamID = TeamIDCache
 		} else {
-			teamIsOnInstance, TeamIDInstance := searchTeam(teamName)
+			teamIsOnInstance, TeamIDInstance := searchTeam(teamName, espXmlmc, buffer)
 			//-- If Returned set output
 			if teamIsOnInstance {
 				teamID = TeamIDInstance
@@ -39,14 +42,9 @@ func getTeamID(teamName string) string {
 }
 
 // searchTeam -- Function to check if passed-through support team name is on the instance
-func searchTeam(teamName string) (bool, string) {
+func searchTeam(teamName string, espXmlmc *apiLib.XmlmcInstStruct, buffer *bytes.Buffer) (bool, string) {
 	boolReturn := false
 	strReturn := ""
-	//-- ESP Query for team
-	espXmlmc, err := NewEspXmlmcSession()
-	if err != nil {
-		return false, "Unable to create connection"
-	}
 	//-- ESP Query for team
 	espXmlmc.SetParam("application", "com.hornbill.servicemanager")
 	espXmlmc.SetParam("entity", "Team")
@@ -65,18 +63,18 @@ func searchTeam(teamName string) (bool, string) {
 
 	XMLTeamSearch, xmlmcErr := espXmlmc.Invoke("data", "entityBrowseRecords2")
 	if xmlmcErr != nil {
-		logger(4, "Unable to Search for Team: "+fmt.Sprintf("%v", xmlmcErr), false)
+		buffer.WriteString(loggerGen(4, "Unable to Search for Team: "+fmt.Sprintf("%v", xmlmcErr)))
 		//log.Fatal(xmlmcErr)
 		return boolReturn, strReturn
 	}
 	var xmlRespon xmlmcTeamListResponse
 
-	err = xml.Unmarshal([]byte(XMLTeamSearch), &xmlRespon)
+	err := xml.Unmarshal([]byte(XMLTeamSearch), &xmlRespon)
 	if err != nil {
-		logger(4, "Unable to Search for Team: "+fmt.Sprintf("%v", err), false)
+		buffer.WriteString(loggerGen(4, "Unable to Search for Team: "+fmt.Sprintf("%v", err)))
 	} else {
 		if xmlRespon.MethodResult != "ok" {
-			logger(5, "Unable to Search for Team: "+xmlRespon.State.ErrorRet, false)
+			buffer.WriteString(loggerGen(5, "Unable to Search for Team: "+xmlRespon.State.ErrorRet))
 		} else {
 			//-- Check Response
 			if xmlRespon.TeamName != "" {
