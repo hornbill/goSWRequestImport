@@ -136,35 +136,23 @@ func applyHistoricalUpdates(request RequestReferences, espXmlmc *apiLib.XmlmcIns
 			espXmlmc.CloseElement("record")
 			espXmlmc.CloseElement("primaryEntityData")
 
-			//-- Check for Dry Run
-			if configDryRun != true {
-				XMLUpdate, xmlmcErr := espXmlmc.Invoke("data", "entityAddRecord")
-				if xmlmcErr != nil {
-					buffer.WriteString(loggerGen(3, "API Invoke Failed Unable to add Historical Call Diary Update: "+fmt.Sprintf("%v", xmlmcErr)))
-					errCount++
-				}
-				var xmlRespon xmlmcResponse
-				errXMLMC := xml.Unmarshal([]byte(XMLUpdate), &xmlRespon)
-				if errXMLMC != nil {
-					buffer.WriteString(loggerGen(4, "Unable to read response from Hornbill instance:"+fmt.Sprintf("%v", errXMLMC)))
-					errCount++
-				}
-				if xmlRespon.MethodResult != "ok" {
-					buffer.WriteString(loggerGen(3, "API Call Failed Unable to add Historical Call Diary Update: "+xmlRespon.State.ErrorRet))
-					errCount++
-				}
-				sucCount++
-
-			} else {
-				//-- DEBUG XML TO LOG FILE
-				var XMLSTRING = espXmlmc.GetParam()
-				buffer.WriteString(loggerGen(1, "Request Historical Update XML "+XMLSTRING))
-				mutexCounters.Lock()
-				counters.createdSkipped++
-				mutexCounters.Unlock()
-				espXmlmc.ClearParam()
-				return
+			XMLUpdate, xmlmcErr := espXmlmc.Invoke("data", "entityAddRecord")
+			if xmlmcErr != nil {
+				buffer.WriteString(loggerGen(3, "API Invoke Failed Unable to add Historical Call Diary Update: "+fmt.Sprintf("%v", xmlmcErr)))
+				errCount++
 			}
+			var xmlRespon xmlmcResponse
+			errXMLMC := xml.Unmarshal([]byte(XMLUpdate), &xmlRespon)
+			if errXMLMC != nil {
+				buffer.WriteString(loggerGen(4, "Unable to read response from Hornbill instance:"+fmt.Sprintf("%v", errXMLMC)))
+				errCount++
+			}
+			if xmlRespon.MethodResult != "ok" {
+				buffer.WriteString(loggerGen(3, "API Call Failed Unable to add Historical Call Diary Update: "+xmlRespon.State.ErrorRet))
+				errCount++
+			}
+			sucCount++
+
 		}
 	}
 	buffer.WriteString(loggerGen(1, strconv.Itoa(sucCount)+" of "+strconv.Itoa(sucCount+errCount)+" Historic Update records created"))

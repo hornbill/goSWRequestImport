@@ -1,3 +1,9 @@
+## 1.5.1 (October 23rd 2018)
+
+Defect fix:
+- Fixed issue with missing log entries in dryrun mode
+
+
 ## 1.5.0 (October 14th 2018)
 
 Features:

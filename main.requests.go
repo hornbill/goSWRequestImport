@@ -532,8 +532,6 @@ func logNewCall(jobs chan RequestDetails, wg *sync.WaitGroup, espXmlmc *apiLib.X
 			counters.createdSkipped++
 			mutexCounters.Unlock()
 			espXmlmc.ClearParam()
-
-			continue
 		}
 		bufferMutex.Lock()
 		loggerWriteBuffer(buffer.String())
