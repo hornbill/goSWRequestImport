@@ -70,6 +70,7 @@ func queryDBCallDetails(callClass, swCallClass, connString string) bool {
 	if callClass == "" || connString == "" {
 		return false
 	}
+
 	//Connect to the JSON specified DB
 	db2, err := sqlx.Open(appDBDriver, connString)
 	if err != nil {

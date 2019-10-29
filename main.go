@@ -2,10 +2,6 @@ package main
 
 import (
 	"fmt"
-	"log"
-	"os"
-	"runtime"
-	"runtime/pprof"
 	"strconv"
 	"strings"
 	"time"
@@ -29,21 +25,9 @@ func main() {
 
 	parseFlags()
 
-	if cpuprofile != "" {
-		f, err := os.Create(cpuprofile)
-		if err != nil {
-			log.Fatal("could not create CPU profile: ", err)
-		}
-		if err := pprof.StartCPUProfile(f); err != nil {
-			log.Fatal("could not start CPU profile: ", err)
-		}
-		defer pprof.StopCPUProfile()
-	}
-
 	//-- Output to CLI and Log
 	logger(1, "---- Supportworks Call Import Utility V"+fmt.Sprintf("%v", version)+" ----", true)
 	logger(1, "Flag - Config File "+configFileName, true)
-	logger(1, "Flag - Zone "+configZone, true)
 	logger(1, "Flag - Dry Run "+fmt.Sprintf("%v", configDryRun), true)
 	logger(1, "Flag - Concurrent Requests "+fmt.Sprintf("%v", configMaxRoutines), true)
 
@@ -96,11 +80,6 @@ func main() {
 		return
 	}
 
-	//-- Set Instance ID
-	SetInstance(configZone, swImportConf.HBConf.InstanceID)
-	//-- Generate Instance XMLMC Endpoint
-	swImportConf.HBConf.URL = getInstanceURL()
-
 	//-- Log in to Hornbill instance
 	var boolLogin = login()
 	if boolLogin != true {
@@ -140,14 +119,10 @@ func main() {
 	}
 
 	if len(arrCallsLogged) > 0 {
-		//Add historic updates to requests
-		processHistoricUpdates()
 		//Add file attachments to requests
-		processAttachments()
+		//processAttachments()
 		//Process associations
 		processCallAssociations()
-		//Optimise the historic call update index
-		//checkHistoricIndex()
 	}
 
 	//-- End output
@@ -159,15 +134,4 @@ func main() {
 	logger(1, "Time Taken: "+fmt.Sprintf("%v", endTime), true)
 	logger(1, "---- Supportworks Call Import Complete ---- ", true)
 
-	if memprofile != "" {
-		f, err := os.Create(memprofile)
-		if err != nil {
-			log.Fatal("could not create memory profile: ", err)
-		}
-		runtime.GC() // get up-to-date statistics
-		if err := pprof.WriteHeapProfile(f); err != nil {
-			log.Fatal("could not write memory profile: ", err)
-		}
-		f.Close()
-	}
 }

@@ -1,14 +1,17 @@
 package main
 
 import (
+	"bytes"
 	"encoding/xml"
 	"fmt"
 	"strconv"
 	"strings"
+
+	"github.com/hornbill/goApiLib"
 )
 
 //getSiteID takes the Call Record and returns a correct Site ID if one exists on the Instance
-func getSiteID(callMap map[string]interface{}) (string, string) {
+func getSiteID(callMap map[string]interface{}, espXmlmc *apiLib.XmlmcInstStruct, buffer *bytes.Buffer) (string, string) {
 	siteID := ""
 	siteNameMapping := fmt.Sprintf("%v", mapGenericConf.CoreFieldMapping["h_site_id"])
 	siteName := getFieldValue(siteNameMapping, callMap)
@@ -18,7 +21,7 @@ func getSiteID(callMap map[string]interface{}) (string, string) {
 		if siteIsInCache {
 			siteID = SiteIDCache
 		} else {
-			siteIsOnInstance, SiteIDInstance := searchSite(siteName)
+			siteIsOnInstance, SiteIDInstance := searchSite(siteName, espXmlmc, buffer)
 			//-- If Returned set output
 			if siteIsOnInstance {
 				siteID = strconv.Itoa(SiteIDInstance)
@@ -29,13 +32,9 @@ func getSiteID(callMap map[string]interface{}) (string, string) {
 }
 
 // seachSite -- Function to check if passed-through  site  name is on the instance
-func searchSite(siteName string) (bool, int) {
+func searchSite(siteName string, espXmlmc *apiLib.XmlmcInstStruct, buffer *bytes.Buffer) (bool, int) {
 	boolReturn := false
 	intReturn := 0
-	espXmlmc, err := NewEspXmlmcSession()
-	if err != nil {
-		return boolReturn, intReturn
-	}
 	//-- ESP Query for site
 	espXmlmc.SetParam("entity", "Site")
 	espXmlmc.SetParam("matchScope", "all")
@@ -48,18 +47,18 @@ func searchSite(siteName string) (bool, int) {
 
 	XMLSiteSearch, xmlmcErr := espXmlmc.Invoke("data", "entityBrowseRecords2")
 	if xmlmcErr != nil {
-		logger(4, "Unable to Search for Site: "+fmt.Sprintf("%v", xmlmcErr), false)
+		buffer.WriteString(loggerGen(4, "Unable to Search for Site: "+fmt.Sprintf("%v", xmlmcErr)))
 		return boolReturn, intReturn
 		//log.Fatal(xmlmcErr)
 	}
 	var xmlRespon xmlmcSiteListResponse
 
-	err = xml.Unmarshal([]byte(XMLSiteSearch), &xmlRespon)
+	err := xml.Unmarshal([]byte(XMLSiteSearch), &xmlRespon)
 	if err != nil {
-		logger(4, "Unable to Search for Site: "+fmt.Sprintf("%v", err), false)
+		buffer.WriteString(loggerGen(4, "Unable to Search for Site: "+fmt.Sprintf("%v", err)))
 	} else {
 		if xmlRespon.MethodResult != "ok" {
-			logger(5, "Unable to Search for Site: "+xmlRespon.State.ErrorRet, false)
+			buffer.WriteString(loggerGen(5, "Unable to Search for Site: "+xmlRespon.State.ErrorRet))
 		} else {
 			//-- Check Response
 			if xmlRespon.SiteName != "" {

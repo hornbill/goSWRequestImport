@@ -1,12 +1,12 @@
 package main
 
 import (
+	"bytes"
 	"encoding/base64"
 	"encoding/xml"
 	"fmt"
-	"time"
 
-	"github.com/hornbill/goapiLib"
+	"github.com/hornbill/goApiLib"
 )
 
 // espLogger -- Log to ESP
@@ -18,35 +18,9 @@ func espLogger(message, severity string) {
 	espXmlmc.Invoke("system", "logMessage")
 }
 
-// SetInstance sets the Zone and Instance config from the passed-through strZone and instanceID values
-func SetInstance(strZone string, instanceID string) {
-	//-- Set Zone
-	SetZone(strZone)
-	//-- Set Instance
-	xmlmcInstanceConfig.instance = instanceID
-}
-
-// SetZone - sets the Instance Zone to Overide current live zone
-func SetZone(zone string) {
-	xmlmcInstanceConfig.zone = zone
-}
-
-// getInstanceURL -- Function to build XMLMC End Point
-func getInstanceURL() string {
-	xmlmcInstanceConfig.url = "https://"
-	xmlmcInstanceConfig.url += xmlmcInstanceConfig.zone
-	xmlmcInstanceConfig.url += "api.hornbill.com/"
-	xmlmcInstanceConfig.url += xmlmcInstanceConfig.instance
-	xmlmcInstanceConfig.url += "/xmlmc/"
-	return xmlmcInstanceConfig.url
-}
-
 //doesAnalystExist takes an Analyst ID string and returns a true if one exists in the cache or on the Instance
-func doesAnalystExist(analystID string) bool {
-	espXmlmc, err := NewEspXmlmcSession()
-	if err != nil {
-		return false
-	}
+func doesAnalystExist(analystID string, espXmlmc *apiLib.XmlmcInstStruct, buffer *bytes.Buffer) bool {
+
 	boolAnalystExists := false
 	if analystID != "" {
 		analystIsInCache, strReturn := recordInCache(analystID, "Analyst")
@@ -59,17 +33,17 @@ func doesAnalystExist(analystID string) bool {
 
 			XMLAnalystSearch, xmlmcErr := espXmlmc.Invoke("admin", "userGetInfo")
 			if xmlmcErr != nil {
-				logger(4, "Unable to Search for Request Owner ["+analystID+"]: "+fmt.Sprintf("%v", xmlmcErr), false)
+				buffer.WriteString(loggerGen(4, "Unable to Search for Request Owner ["+analystID+"]: "+fmt.Sprintf("%v", xmlmcErr)))
 			}
 
 			var xmlRespon xmlmcAnalystListResponse
 			err := xml.Unmarshal([]byte(XMLAnalystSearch), &xmlRespon)
 			if err != nil {
-				logger(4, "Unable to Search for Request Owner ["+analystID+"]: "+fmt.Sprintf("%v", err), false)
+				buffer.WriteString(loggerGen(4, "Unable to Search for Request Owner ["+analystID+"]: "+fmt.Sprintf("%v", err)))
 			} else {
 				if xmlRespon.MethodResult != "ok" {
 					//Analyst most likely does not exist
-					logger(5, "Unable to Search for Request Owner ["+analystID+"]: "+xmlRespon.State.ErrorRet, false)
+					buffer.WriteString(loggerGen(5, "Unable to Search for Request Owner ["+analystID+"]: "+xmlRespon.State.ErrorRet))
 				} else {
 					//-- Check Response
 					if xmlRespon.AnalystFullName != "" {
@@ -91,12 +65,8 @@ func doesAnalystExist(analystID string) bool {
 }
 
 //doesCustomerExist takes a Customer ID string and returns a true if one exists in the cache or on the Instance
-func doesCustomerExist(customerID string) bool {
+func doesCustomerExist(customerID string, espXmlmc *apiLib.XmlmcInstStruct, buffer *bytes.Buffer) bool {
 	boolCustomerExists := false
-	espXmlmc, err := NewEspXmlmcSession()
-	if err != nil {
-		return false
-	}
 
 	if customerID != "" {
 		customerIsInCache, strReturn := recordInCache(customerID, "Customer")
@@ -109,17 +79,17 @@ func doesCustomerExist(customerID string) bool {
 			espXmlmc.SetParam("customerType", swImportConf.CustomerType)
 			XMLCustomerSearch, xmlmcErr := espXmlmc.Invoke("apps/"+appServiceManager, "shrGetCustomerDetails")
 			if xmlmcErr != nil {
-				logger(4, "Unable to Search for Customer ["+customerID+"]: "+fmt.Sprintf("%v", xmlmcErr), false)
+				buffer.WriteString(loggerGen(4, "Unable to Search for Customer ["+customerID+"]: "+fmt.Sprintf("%v", xmlmcErr)))
 			}
 
 			var xmlRespon xmlmcCustomerListResponse
 			err := xml.Unmarshal([]byte(XMLCustomerSearch), &xmlRespon)
 			if err != nil {
-				logger(4, "Unable to Search for Customer ["+customerID+"]: "+fmt.Sprintf("%v", err), false)
+				buffer.WriteString(loggerGen(4, "Unable to Search for Customer ["+customerID+"]: "+fmt.Sprintf("%v", err)))
 			} else {
 				if xmlRespon.MethodResult != "ok" {
 					//Customer most likely does not exist
-					logger(5, "Unable to Search for Customer ["+customerID+"]: "+xmlRespon.State.ErrorRet, false)
+					buffer.WriteString(loggerGen(5, "Unable to Search for Customer ["+customerID+"]: "+xmlRespon.State.ErrorRet))
 				} else {
 					//-- Check Response
 					if xmlRespon.CustomerFirstName != "" {
@@ -140,35 +110,18 @@ func doesCustomerExist(customerID string) bool {
 	return boolCustomerExists
 }
 
-/*func checkInstanceSession() (string, bool) {
-	errorMessage := ""
-	boolValid := false
-	espXmlmc := apiLib.NewXmlmcInstance(swImportConf.HBConf.URL)
-	espXmlmc.SetSessionID(espXmlmc.GetSessionID())
-
-	_, xmlmcErr := espXmlmc.Invoke("session", "isSessionValid")
-	if xmlmcErr != nil {
-		errorMessage = fmt.Sprintf("Unable to create new Hornbill session: %v", xmlmcErr)
-	} else {
-		boolValid = true
-	}
-
-	return errorMessage, boolValid
-}*/
-
 //NewEspXmlmcSession - New Xmlmc Session variable (Cloned Session)
 func NewEspXmlmcSession() (*apiLib.XmlmcInstStruct, error) {
-	time.Sleep(150 * time.Millisecond)
-	espXmlmcLocal := apiLib.NewXmlmcInstance(swImportConf.HBConf.URL)
+	espXmlmcLocal := apiLib.NewXmlmcInstance(swImportConf.HBConf.InstanceID)
 	espXmlmcLocal.SetSessionID(espXmlmc.GetSessionID())
 	return espXmlmcLocal, nil
 }
 
 //-- start ESP user session
 func login() bool {
-	logger(1, "Logging Into: "+swImportConf.HBConf.URL, false)
+	logger(1, "Logging Into: "+swImportConf.HBConf.InstanceID, true)
 	logger(1, "UserName: "+swImportConf.HBConf.UserName, false)
-	espXmlmc = apiLib.NewXmlmcInstance(swImportConf.HBConf.URL)
+	espXmlmc = apiLib.NewXmlmcInstance(swImportConf.HBConf.InstanceID)
 
 	espXmlmc.SetParam("userId", swImportConf.HBConf.UserName)
 	espXmlmc.SetParam("password", base64.StdEncoding.EncodeToString([]byte(swImportConf.HBConf.Password)))
