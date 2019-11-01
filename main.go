@@ -9,7 +9,6 @@ import (
 	"github.com/hornbill/color"
 	_ "github.com/hornbill/go-mssqldb" //Microsoft SQL Server driver - v2005+
 	_ "github.com/hornbill/mysql"      //MySQL v4.1 to v5.x and MariaDB driver
-	//_ "github.com/hornbill/mysql320"   //MySQL v3.2.0 to v5 driver - Provides SWSQL (MySQL 4.0.16) support
 	_ "github.com/weave-lab/mysql320" //MySQL v3.2.0 to v5 driver - Provides SWSQL (MySQL 4.0.16) support
 
 	"github.com/hornbill/sqlx"

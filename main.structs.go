@@ -236,15 +236,6 @@ type xmlmcCategoryListResponse struct {
 	CategoryName string      `xml:"params>fullname"`
 	State        stateStruct `xml:"state"`
 }
-
-//----- Audit Structs
-/*type xmlmcAuditListResponse struct {
-	MethodResult     string      `xml:"status,attr"`
-	TotalStorage     float64     `xml:"params>maxStorageAvailble"`
-	TotalStorageUsed float64     `xml:"params>totalStorageUsed"`
-	State            stateStruct `xml:"state"`
-}*/
-
 //----- Analyst Structs
 type analystListStruct struct {
 	AnalystID   string

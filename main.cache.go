@@ -2,11 +2,8 @@ package main
 
 import (
 	"strconv"
-
 	"fmt"
-
 	"encoding/xml"
-	//	"github.com/hornbill/goApiLib"
 )
 
 // recordInCache -- Function to check if passed-thorugh record name has been cached

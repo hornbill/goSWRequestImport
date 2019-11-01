@@ -8,7 +8,7 @@ Defect fix:
 
 ## 1.5.2 (February 18th, 2019)
 
-Defec fix:
+Defect fix:
 
 - Fixed connection string errors seen when importing historic update records from MSSQL data source
 
