@@ -210,6 +210,7 @@ func parseFlags() {
 	flag.StringVar(&configFileName, "file", "conf.json", "Name of the configuration file to load")
 	flag.BoolVar(&configDryRun, "dryrun", false, "Dump import XML to log instead of creating requests")
 	flag.BoolVar(&configDebug, "debug", false, "Additional logging for debugging.")
+	flag.BoolVar(&configCustomerOrg, "contactOrg", false, "Adopt Contact Organisation for the call")
 	flag.StringVar(&configMaxRoutines, "concurrent", "1", "Maximum number of requests to import concurrently.")
 	flag.BoolVar(&boolProcessAttachments, "attachments", false, "Import attachemnts without prompting.")
 	flag.Parse()

@@ -39,13 +39,11 @@ func searchSite(siteName string, espXmlmc *apiLib.XmlmcInstStruct, buffer *bytes
 	espXmlmc.SetParam("entity", "Site")
 	espXmlmc.SetParam("matchScope", "all")
 	espXmlmc.OpenElement("searchFilter")
-	//espXmlmc.SetParam("h_site_name", siteName)
-	espXmlmc.SetParam("column", "h_site_name")
-	espXmlmc.SetParam("value", siteName)
+	espXmlmc.SetParam("h_site_name", siteName)
 	espXmlmc.CloseElement("searchFilter")
 	espXmlmc.SetParam("maxResults", "1")
 
-	XMLSiteSearch, xmlmcErr := espXmlmc.Invoke("data", "entityBrowseRecords2")
+	XMLSiteSearch, xmlmcErr := espXmlmc.Invoke("data", "entityBrowseRecords")
 	if xmlmcErr != nil {
 		buffer.WriteString(loggerGen(4, "Unable to Search for Site: "+fmt.Sprintf("%v", xmlmcErr)))
 		return boolReturn, intReturn

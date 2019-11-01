@@ -9,7 +9,7 @@ import (
 )
 
 const (
-	version           = "1.5.2"
+	version           = "1.6.0"
 	appServiceManager = "com.hornbill.servicemanager"
 )
 
@@ -23,6 +23,7 @@ var (
 	configFileName         string
 	configDryRun           bool
 	configDebug            bool
+	configCustomerOrg      bool
 	configMaxRoutines      string
 	connStrSysDB           string
 	connStrAppDB           string
@@ -33,6 +34,7 @@ var (
 	categories             []categoryListStruct
 	closeCategories        []categoryListStruct
 	customers              []customerListStruct
+	companies              []companyListStruct
 	priorities             []priorityListStruct
 	services               []serviceListStruct
 	sites                  []siteListStruct
@@ -51,6 +53,7 @@ var (
 	mutexCloseCategories   = &sync.Mutex{}
 	mutexCounters          = &sync.Mutex{}
 	mutexCustomers         = &sync.Mutex{}
+	mutexCompanies         = &sync.Mutex{}
 	mutexPriorities        = &sync.Mutex{}
 	mutexServices          = &sync.Mutex{}
 	mutexSites             = &sync.Mutex{}
@@ -257,14 +260,40 @@ type xmlmcAnalystListResponse struct {
 
 //----- Customer Structs
 type customerListStruct struct {
-	CustomerID   string
-	CustomerName string
+	CustomerHornbillID string
+	CustomerID         string
+	CustomerName       string
+	CustomerOrgID      string
+}
+type companyListStruct struct {
+	OrgID       string
+	ContainerID string
+}
+type xmlmcOrgListResponse struct {
+	MethodResult string                 `xml:"status,attr"`
+	RowResult    []xmlCompanyListStruct `xml:"params>rowData>row"`
+	State        stateStruct            `xml:"state"`
+}
+type xmlCompanyListStruct struct {
+	OrgID       string `xml:"h_organization_id"`
+	ContainerID string `xml:"h_id"`
+}
+
+type xmlmcContactListResponse struct {
+	MethodResult       string      `xml:"status,attr"`
+	CustomerFirstName  string      `xml:"params>rowData>row>h_firstname"`
+	CustomerLastName   string      `xml:"params>rowData>row>h_lastname"`
+	CustomerOrgID      string      `xml:"params>rowData>row>h_organization_id"`
+	CustomerHornbillID string      `xml:"params>rowData>row>h_pk_id"`
+	State              stateStruct `xml:"state"`
 }
 type xmlmcCustomerListResponse struct {
-	MethodResult      string      `xml:"status,attr"`
-	CustomerFirstName string      `xml:"params>firstName"`
-	CustomerLastName  string      `xml:"params>lastName"`
-	State             stateStruct `xml:"state"`
+	MethodResult       string      `xml:"status,attr"`
+	CustomerFirstName  string      `xml:"params>rowData>row>h_first_name"`
+	CustomerLastName   string      `xml:"params>rowData>row>h_last_name"`
+	CustomerOrgID      string      `xml:"params>rowData>row>h_organization_id"` // probably not used at all
+	CustomerHornbillID string      `xml:"params>rowData>row>h_user_id"`
+	State              stateStruct `xml:"state"`
 }
 
 //----- Associated Record Struct

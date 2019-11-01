@@ -51,13 +51,11 @@ func searchPriority(priorityName string, espXmlmc *apiLib.XmlmcInstStruct, buffe
 	espXmlmc.SetParam("entity", "Priority")
 	espXmlmc.SetParam("matchScope", "all")
 	espXmlmc.OpenElement("searchFilter")
-	//espXmlmc.SetParam("h_priorityname", priorityName)
-	espXmlmc.SetParam("column", "h_priorityname")
-	espXmlmc.SetParam("value", priorityName)
+	espXmlmc.SetParam("h_priorityname", priorityName)
 	espXmlmc.CloseElement("searchFilter")
 	espXmlmc.SetParam("maxResults", "1")
 
-	XMLPrioritySearch, xmlmcErr := espXmlmc.Invoke("data", "entityBrowseRecords2")
+	XMLPrioritySearch, xmlmcErr := espXmlmc.Invoke("data", "entityBrowseRecords")
 	if xmlmcErr != nil {
 		buffer.WriteString(loggerGen(4, "Unable to Search for Priority: "+fmt.Sprintf("%v", xmlmcErr)))
 		return boolReturn, intReturn

@@ -75,33 +75,91 @@ func doesCustomerExist(customerID string, espXmlmc *apiLib.XmlmcInstStruct, buff
 			boolCustomerExists = true
 		} else {
 			//Get Analyst Info
-			espXmlmc.SetParam("customerId", customerID)
-			espXmlmc.SetParam("customerType", swImportConf.CustomerType)
-			XMLCustomerSearch, xmlmcErr := espXmlmc.Invoke("apps/"+appServiceManager, "shrGetCustomerDetails")
+			if swImportConf.CustomerType == "1" {
+				espXmlmc.SetParam("entity", "Contact")
+			} else {
+				espXmlmc.SetParam("entity", "UserAccount")
+			}
+			espXmlmc.SetParam("matchScope", "all")
+
+			espXmlmc.OpenElement("searchFilter")
+			if swImportConf.CustomerType == "1" {
+				espXmlmc.SetParam("column", "h_logon_id")
+			} else {
+				espXmlmc.SetParam("column", "h_user_id")
+			}
+			espXmlmc.SetParam("value", customerID)
+			espXmlmc.SetParam("matchType", "exact")
+			espXmlmc.CloseElement("searchFilter")
+			espXmlmc.SetParam("maxResults", "1")
+			//fmt.Println(espXmlmc.GetParam())
+			//fmt.Println(swImportConf.CustomerType)
+
+			XMLCustomerSearch, xmlmcErr := espXmlmc.Invoke("data", "entityBrowseRecords2")
 			if xmlmcErr != nil {
 				buffer.WriteString(loggerGen(4, "Unable to Search for Customer ["+customerID+"]: "+fmt.Sprintf("%v", xmlmcErr)))
 			}
+			//fmt.Println(XMLCustomerSearch)
+			//xmlRespon := nil
+			if swImportConf.CustomerType == "1" {
+				var xmlRespon xmlmcContactListResponse
 
-			var xmlRespon xmlmcCustomerListResponse
-			err := xml.Unmarshal([]byte(XMLCustomerSearch), &xmlRespon)
-			if err != nil {
-				buffer.WriteString(loggerGen(4, "Unable to Search for Customer ["+customerID+"]: "+fmt.Sprintf("%v", err)))
-			} else {
-				if xmlRespon.MethodResult != "ok" {
-					//Customer most likely does not exist
-					buffer.WriteString(loggerGen(5, "Unable to Search for Customer ["+customerID+"]: "+xmlRespon.State.ErrorRet))
+				err := xml.Unmarshal([]byte(XMLCustomerSearch), &xmlRespon)
+				if err != nil {
+					buffer.WriteString(loggerGen(4, "Unable to Search for Customer ["+customerID+"]: "+fmt.Sprintf("%v", err)))
 				} else {
-					//-- Check Response
-					if xmlRespon.CustomerFirstName != "" {
-						boolCustomerExists = true
-						//-- Add Customer to Cache
-						var newCustomerForCache customerListStruct
-						newCustomerForCache.CustomerID = customerID
-						newCustomerForCache.CustomerName = xmlRespon.CustomerFirstName + " " + xmlRespon.CustomerLastName
-						customerNamedMap := []customerListStruct{newCustomerForCache}
-						mutexCustomers.Lock()
-						customers = append(customers, customerNamedMap...)
-						mutexCustomers.Unlock()
+					if xmlRespon.MethodResult != "ok" {
+						//Customer most likely does not exist
+						buffer.WriteString(loggerGen(5, "Unable to Search for Customer ["+customerID+"]: "+xmlRespon.State.ErrorRet))
+					} else {
+						//-- Check Response
+						if xmlRespon.CustomerFirstName != "" {
+							boolCustomerExists = true
+							//-- Add Customer to Cache
+							var newCustomerForCache customerListStruct
+							newCustomerForCache.CustomerID = customerID
+							newCustomerForCache.CustomerHornbillID = xmlRespon.CustomerHornbillID
+							newCustomerForCache.CustomerOrgID = xmlRespon.CustomerOrgID
+							newCustomerForCache.CustomerName = xmlRespon.CustomerFirstName + " " + xmlRespon.CustomerLastName
+							customerNamedMap := []customerListStruct{newCustomerForCache}
+							mutexCustomers.Lock()
+							customers = append(customers, customerNamedMap...)
+							mutexCustomers.Unlock()
+
+							buffer.WriteString(loggerGen(5, "Added Customer ["+customerID+"]: "+newCustomerForCache.CustomerName))
+
+						}
+					}
+				}
+
+			} else {
+				var xmlRespon xmlmcCustomerListResponse
+
+				err := xml.Unmarshal([]byte(XMLCustomerSearch), &xmlRespon)
+				if err != nil {
+					buffer.WriteString(loggerGen(4, "Unable to Search for Customer ["+customerID+"].: "+fmt.Sprintf("%v", err)))
+				} else {
+					if xmlRespon.MethodResult != "ok" {
+						//Customer most likely does not exist
+						buffer.WriteString(loggerGen(5, "Unable to Search for Customer ["+customerID+"].: "+xmlRespon.State.ErrorRet))
+					} else {
+						//-- Check Response
+						if xmlRespon.CustomerFirstName != "" {
+							boolCustomerExists = true
+							//-- Add Customer to Cache
+							var newCustomerForCache customerListStruct
+							newCustomerForCache.CustomerID = customerID
+							newCustomerForCache.CustomerOrgID = xmlRespon.CustomerOrgID
+							newCustomerForCache.CustomerHornbillID = xmlRespon.CustomerHornbillID
+							newCustomerForCache.CustomerName = xmlRespon.CustomerFirstName + " " + xmlRespon.CustomerLastName
+							customerNamedMap := []customerListStruct{newCustomerForCache}
+							mutexCustomers.Lock()
+							customers = append(customers, customerNamedMap...)
+							mutexCustomers.Unlock()
+
+							buffer.WriteString(loggerGen(5, "Added Customer ["+customerID+"].: "+newCustomerForCache.CustomerName))
+
+						}
 					}
 				}
 			}

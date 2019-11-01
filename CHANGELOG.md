@@ -1,5 +1,11 @@
 # CHANGELOG
 
+## 1.6.0 (November 1st, 2019)
+
+Defect fix:
+
+- Fixed Customer Search
+
 ## 1.5.2 (February 18th, 2019)
 
 Defec fix:

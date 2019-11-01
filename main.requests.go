@@ -121,9 +121,23 @@ func logNewCall(jobs chan RequestDetails, wg *sync.WaitGroup, espXmlmc *apiLib.X
 					if boolCustExists {
 						//Get customer from cache as exists
 						customerIsInCache, strCustName := recordInCache(strCustID, "Customer")
-						if customerIsInCache && strCustName != "" {
-							coreFields[strAttribute] = strCustID
-							coreFields["h_fk_user_name"] = strCustName
+						if customerIsInCache && strCustName != "" && strCustName != "{||||||}{||||||}" {
+							A := strings.Split(strCustName, "{||||||}")
+							coreFields[strAttribute] = A[1]
+							//fmt.Println("ID:" + A[1])
+							//fmt.Println("Name:" + A[0])
+							//fmt.Println("OrgID:" + A[2])
+							coreFields["h_fk_user_name"] = A[0]
+							if configCustomerOrg {
+								if A[2] != "" {
+									coreFields["h_org_id"] = A[2]
+									foundOrg, OrgContainerID := recordInCache(A[2], "Company")
+									//fmt.Println("ContID:" + OrgContainerID)
+									if foundOrg && OrgContainerID != "" {
+										coreFields["h_container_id"] = OrgContainerID
+									}
+								}
+							}
 						}
 					}
 				}

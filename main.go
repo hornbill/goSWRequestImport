@@ -108,6 +108,8 @@ func main() {
 	}
 	defer dbapp.Close()
 
+	loadOrgs()
+
 	//Get request type import config, process each in turn
 	for _, val := range swImportConf.RequestTypesToImport {
 		if val.Import == true {

@@ -2,6 +2,11 @@ package main
 
 import (
 	"strconv"
+
+	"fmt"
+
+	"encoding/xml"
+	//	"github.com/hornbill/goApiLib"
 )
 
 // recordInCache -- Function to check if passed-thorugh record name has been cached
@@ -66,12 +71,60 @@ func recordInCache(recordName, recordType string) (bool, string) {
 		for _, customer := range customers {
 			if customer.CustomerID == recordName {
 				boolReturn = true
-				strReturn = customer.CustomerName
+				strReturn = customer.CustomerName + "{||||||}" + customer.CustomerHornbillID + "{||||||}" + customer.CustomerOrgID
+				//strReturn = customer.CustomerHornbillID
 			}
 		}
 		mutexCustomers.Unlock()
+	case "Company":
+		//-- Check if record in Customer Cache
+		mutexCompanies.Lock()
+		for _, company := range companies {
+			if company.OrgID == recordName {
+				boolReturn = true
+				strReturn = company.ContainerID
+				//strReturn = customer.CustomerHornbillID
+			}
+		}
+		mutexCompanies.Unlock()
 	}
 	return boolReturn, strReturn
+}
+
+func loadOrgs() {
+
+	espXmlmc, err := NewEspXmlmcSession()
+	if err != nil {
+		fmt.Println("AAA")
+		return
+	}
+
+	espXmlmc.SetParam("application", appServiceManager)
+	espXmlmc.SetParam("queryName", "getOrganizationContainers")
+	XMLOrgSearch, xmlmcErr := espXmlmc.Invoke("data", "queryExec")
+	if xmlmcErr != nil {
+		return
+	}
+
+	var xmlRespon xmlmcOrgListResponse
+	//fmt.Println(XMLOrgSearch)
+	err2 := xml.Unmarshal([]byte(XMLOrgSearch), &xmlRespon)
+	if err2 != nil {
+		return
+	}
+
+	mutexCompanies.Lock()
+
+	for index := range xmlRespon.RowResult {
+		var newOrgForCache companyListStruct
+		newOrgForCache.OrgID = xmlRespon.RowResult[index].OrgID
+		newOrgForCache.ContainerID = xmlRespon.RowResult[index].ContainerID
+		companyNamedMap := []companyListStruct{newOrgForCache}
+		companies = append(companies, companyNamedMap...)
+	}
+
+	mutexCompanies.Unlock()
+
 }
 
 // categoryInCache -- Function to check if passed-thorugh category been cached
