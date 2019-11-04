@@ -1,5 +1,11 @@
 # CHANGELOG
 
+## 1.6.1 (November 4th, 2019)
+
+Defect fix:
+
+- Weave-lab version of MySQL320 has not been available for a while - using the hornbill backup/fork.
+
 ## 1.6.0 (November 1st, 2019)
 
 Defect fix:
