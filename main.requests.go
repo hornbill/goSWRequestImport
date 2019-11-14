@@ -7,8 +7,10 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+
 	/* non core libraries */
-	"github.com/hornbill/goApiLib"
+
+	apiLib "github.com/hornbill/goApiLib"
 	"github.com/hornbill/pb"
 )
 
@@ -481,8 +483,6 @@ func logNewCall(jobs chan RequestDetails, wg *sync.WaitGroup, espXmlmc *apiLib.X
 						if xmlRespon.MethodResult != "ok" {
 							buffer.WriteString(loggerGen(4, "Unable to invoke BPM for request ["+strNewCallRef+"]: "+xmlRespon.State.ErrorRet))
 						} else {
-
-							//time.Sleep(500 * time.Millisecond)
 							//Now, associate spawned BPM to the new Request
 							espXmlmc.SetParam("application", appServiceManager)
 							espXmlmc.SetParam("entity", "Requests")
@@ -536,7 +536,7 @@ func logNewCall(jobs chan RequestDetails, wg *sync.WaitGroup, espXmlmc *apiLib.X
 				applyHistoricalUpdates(request, espXmlmc, &buffer)
 
 				//Now process File Attachments
-				processFileAttachments(swCallID, strNewCallRef, espXmlmc, &buffer)
+				//processFileAttachments(swCallID, strNewCallRef, espXmlmc, &buffer)
 			}
 		} else {
 			//-- DEBUG XML TO LOG FILE

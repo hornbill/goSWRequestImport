@@ -9,7 +9,7 @@ import (
 	"github.com/hornbill/color"
 	_ "github.com/hornbill/go-mssqldb" //Microsoft SQL Server driver - v2005+
 	_ "github.com/hornbill/mysql"      //MySQL v4.1 to v5.x and MariaDB driver
-	_ "github.com/hornbill/mysql320" //MySQL v3.2.0 to v5 driver - Provides SWSQL (MySQL 4.0.16) support - originally weave-lab
+	_ "github.com/hornbill/mysql320"   //MySQL v3.2.0 to v5 driver - Provides SWSQL (MySQL 4.0.16) support - originally weave-lab
 	"github.com/hornbill/sqlx"
 )
 
@@ -22,7 +22,11 @@ func main() {
 	timeNow = strings.Replace(timeNow, ":", "-", -1)
 
 	parseFlags()
-
+	//-- Used for Building
+	if configVersion {
+		fmt.Printf("%v \n", version)
+		return
+	}
 	//-- Output to CLI and Log
 	logger(1, "---- Supportworks Call Import Utility V"+fmt.Sprintf("%v", version)+" ----", true)
 	logger(1, "Flag - Config File "+configFileName, true)
@@ -111,7 +115,6 @@ func main() {
 	//Get request type import config, process each in turn
 	for _, val := range swImportConf.RequestTypesToImport {
 		if val.Import == true {
-			time.Sleep(1000 * time.Millisecond)
 			reqPrefix = getRequestPrefix(val.CallClass)
 			mapGenericConf = val
 			processCallData()
@@ -119,10 +122,10 @@ func main() {
 	}
 
 	if len(arrCallsLogged) > 0 {
-		//Add file attachments to requests
-		//processAttachments()
 		//Process associations
 		processCallAssociations()
+		//Add file attachments to requests
+		processAttachments()
 	}
 
 	//-- End output

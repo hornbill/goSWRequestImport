@@ -1,5 +1,11 @@
 # CHANGELOG
 
+## 1.7.0 (November 14th, 2019)
+
+Feature:
+
+- The tool now performs file attachment processing once the requests have been imported
+
 ## 1.6.1 (November 4th, 2019)
 
 Defect fix:

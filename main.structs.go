@@ -4,12 +4,12 @@ import (
 	"sync"
 	"time"
 
-	"github.com/hornbill/goApiLib"
+	apiLib "github.com/hornbill/goApiLib"
 	"github.com/hornbill/sqlx"
 )
 
 const (
-	version           = "1.6.1"
+	version           = "1.7.0"
 	appServiceManager = "com.hornbill.servicemanager"
 )
 
@@ -25,6 +25,7 @@ var (
 	configDebug            bool
 	configCustomerOrg      bool
 	configMaxRoutines      string
+	configVersion          bool
 	connStrSysDB           string
 	connStrAppDB           string
 	espXmlmc               *apiLib.XmlmcInstStruct
@@ -236,6 +237,7 @@ type xmlmcCategoryListResponse struct {
 	CategoryName string      `xml:"params>fullname"`
 	State        stateStruct `xml:"state"`
 }
+
 //----- Analyst Structs
 type analystListStruct struct {
 	AnalystID   string

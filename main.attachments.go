@@ -2,7 +2,6 @@ package main
 
 import (
 	"bufio"
-	"bytes"
 	"encoding/base64"
 	"encoding/xml"
 	"fmt"
@@ -13,14 +12,32 @@ import (
 	"strings"
 	"unicode/utf8"
 
-	"github.com/hornbill/goApiLib"
+	apiLib "github.com/hornbill/goApiLib"
+	"github.com/hornbill/pb"
 )
 
-func processFileAttachments(swCallRef, smCallRef string, espXmlmc *apiLib.XmlmcInstStruct, buffer *bytes.Buffer) {
+func processAttachments() {
+	//Process attachments for all imported requests
+	espXmlmc, err := NewEspXmlmcSession()
+	if err != nil {
+		logger(4, "Could not connect to Hornbill Instance: "+fmt.Sprintf("%v", err), false)
+		return
 
-	requestAttachments := fileAttachmentData(swCallRef, smCallRef, buffer)
+	}
+	logger(1, "Processing file attachments for "+fmt.Sprint(len(arrCallsLogged))+" imported requests.", true)
+	bar := pb.StartNew(len(arrCallsLogged))
+	for swRef, smRef := range arrCallsLogged {
+		processFileAttachments(swRef, smRef, espXmlmc)
+		bar.Increment()
+	}
+	bar.FinishPrint("File Attachment Import Complete")
+}
+
+func processFileAttachments(swCallRef, smCallRef string, espXmlmc *apiLib.XmlmcInstStruct) {
+
+	requestAttachments := fileAttachmentData(swCallRef, smCallRef)
 	if len(requestAttachments) > 0 {
-		buffer.WriteString(loggerGen(1, "Processing "+strconv.Itoa(len(requestAttachments))+"  File Attachments for "+swCallRef+"["+smCallRef+"]"))
+		logger(1, "Processing "+strconv.Itoa(len(requestAttachments))+"  File Attachments for "+swCallRef+"["+smCallRef+"]", false)
 	}
 	for i := 0; i < len(requestAttachments); i++ {
 		entityRequest := ""
@@ -41,13 +58,13 @@ func processFileAttachments(swCallRef, smCallRef string, espXmlmc *apiLib.XmlmcI
 			fileRecord.FileName = fileRecord.FileName + ".txt"
 			//Further processing for SWM files
 			//Copy content in to TXT file, and attach this instead
-			swmDecoded, boolDecoded := decodeSWMFile(fileRecord, espXmlmc, buffer)
+			swmDecoded, boolDecoded := decodeSWMFile(fileRecord, espXmlmc)
 			if boolDecoded {
 				if swmDecoded.Content != "" {
 					fileRecord.FileData = base64.StdEncoding.EncodeToString([]byte(swmDecoded.Content))
 				}
 				fileRecord.Description = "Originally added by " + fileRecord.AddedBy
-				addFileContent(entityRequest, fileRecord, espXmlmc, buffer)
+				addFileContent(entityRequest, fileRecord, espXmlmc)
 				for j := 0; j < len(swmDecoded.Attachments); j++ {
 					fileRecord.Description = "File extracted from " + fileRecord.FileName
 					fileRecord.EmailAttachment = swmDecoded.Attachments[j]
@@ -55,34 +72,38 @@ func processFileAttachments(swCallRef, smCallRef string, espXmlmc *apiLib.XmlmcI
 					fileRecord.FileData = swmDecoded.Attachments[j].FileData
 					fileRecord.SizeU, _ = strconv.ParseFloat(swmDecoded.Attachments[j].FileSize, 64)
 					fileRecord.SizeC, _ = strconv.ParseFloat(swmDecoded.Attachments[j].FileSize, 64)
-					addFileContent(entityRequest, fileRecord, espXmlmc, buffer)
+					addFileContent(entityRequest, fileRecord, espXmlmc)
 				}
 			}
 		} else {
-			fileRecord.FileData = getFileEncoded(fileRecord, buffer)
-			fileRecord.Description = "Originally added by " + fileRecord.AddedBy
-			addFileContent(entityRequest, fileRecord, espXmlmc, buffer)
+			var err error
+			fileRecord.FileData, err = getFileEncoded(fileRecord)
+			if err == nil {
+				fileRecord.Description = "Originally added by " + fileRecord.AddedBy
+				addFileContent(entityRequest, fileRecord, espXmlmc)
+			}
 		}
 	}
 }
 
 //getFileEncoded - get encoded file data
-func getFileEncoded(fileRecord fileAssocStruct, buffer *bytes.Buffer) string {
+func getFileEncoded(fileRecord fileAssocStruct) (string, error) {
 	subFolderName := getSubFolderName(fileRecord.CallRef)
 	hostFileName := padCallRef(fileRecord.CallRef, "f", 8) + "." + padCallRef(fileRecord.DataID, "", 3)
 	fullFilePath := swImportConf.AttachmentRoot + "/" + subFolderName + "/" + hostFileName
+	logger(1, "Retrieving File ["+fileRecord.FileName+"] from: "+fullFilePath, false)
 
 	//Get File Data
 	if _, fileCheckErr := os.Stat(fullFilePath); os.IsNotExist(fileCheckErr) {
-		buffer.WriteString(loggerGen(4, "File does not exist at location."))
-		return ""
+		logger(4, "File does not exist at location", false)
+		return "", fileCheckErr
 	}
 	//-- Load Config File
 	file, fileError := os.Open(fullFilePath)
 	//-- Check For Error Reading File
 	if fileError != nil {
-		buffer.WriteString(loggerGen(4, "Error Opening File: "+fmt.Sprintf("%v", fileError)))
-		return ""
+		logger(4, "Error Opening File: "+fmt.Sprintf("%v", fileError), false)
+		return "", fileError
 	}
 	defer file.Close()
 	// create a new buffer base on file size
@@ -94,18 +115,18 @@ func getFileEncoded(fileRecord fileAssocStruct, buffer *bytes.Buffer) string {
 	fReader := bufio.NewReader(file)
 	fReader.Read(buf)
 	fileEncoded := base64.StdEncoding.EncodeToString(buf)
-	return fileEncoded
+	return fileEncoded, nil
 }
 
 //Get file attachment records from Supportworks
-func fileAttachmentData(swRequest, smRequest string, buffer *bytes.Buffer) []fileAssocStruct {
-	intSwCallRef := getCallRefInt(swRequest, buffer)
+func fileAttachmentData(swRequest, smRequest string) []fileAssocStruct {
+	intSwCallRef := getCallRefInt(swRequest)
 	var returnArray = make([]fileAssocStruct, 0)
 	//Connect to the JSON specified DB
 	//Check connection is open
 	err := dbsys.Ping()
 	if err != nil {
-		buffer.WriteString(loggerGen(4, "[DATABASE] [PING] Database Connection Error for Request File Attachments: "+fmt.Sprintf("%v", err)))
+		logger(4, "[DATABASE] [PING] Database Connection Error for Request File Attachments: "+fmt.Sprintf("%v", err), false)
 		return returnArray
 	}
 
@@ -116,7 +137,7 @@ func fileAttachmentData(swRequest, smRequest string, buffer *bytes.Buffer) []fil
 	//Run Query
 	rows, err := dbsys.Queryx(sqlFileQuery)
 	if err != nil {
-		buffer.WriteString(loggerGen(4, " Database Query Error: "+fmt.Sprintf("%v", err)))
+		logger(4, " Database Query Error: "+fmt.Sprintf("%v", err), false)
 		return returnArray
 	}
 	//-- Iterate through file attachment records returned from SQL query:
@@ -125,7 +146,7 @@ func fileAttachmentData(swRequest, smRequest string, buffer *bytes.Buffer) []fil
 		var requestAttachment fileAssocStruct
 		err = rows.StructScan(&requestAttachment)
 		if err != nil {
-			buffer.WriteString(loggerGen(4, " Data Mapping Error: "+fmt.Sprintf("%v", err)))
+			logger(4, " Data Mapping Error: "+fmt.Sprintf("%v", err), false)
 		}
 		//Add to array for reponse
 		returnArray = append(returnArray, requestAttachment)
@@ -134,7 +155,7 @@ func fileAttachmentData(swRequest, smRequest string, buffer *bytes.Buffer) []fil
 }
 
 //decodeSWMFile - reads the email attachment from Supportworks, returns the content & any attachments within
-func decodeSWMFile(fileRecord fileAssocStruct, espXmlmc *apiLib.XmlmcInstStruct, buffer *bytes.Buffer) (swmStruct, bool) {
+func decodeSWMFile(fileRecord fileAssocStruct, espXmlmc *apiLib.XmlmcInstStruct) (swmStruct, bool) {
 	var returnStruct swmStruct
 	returnStruct.Content = ""
 	returnStruct.Subject = ""
@@ -142,17 +163,17 @@ func decodeSWMFile(fileRecord fileAssocStruct, espXmlmc *apiLib.XmlmcInstStruct,
 	subFolderName := getSubFolderName(fileRecord.CallRef)
 	hostFileName := padCallRef(fileRecord.CallRef, "f", 8) + "." + padCallRef(fileRecord.DataID, "", 3)
 	fullFilePath := swImportConf.AttachmentRoot + "/" + subFolderName + "/" + hostFileName
-
+	logger(1, "Decoding email file ["+fileRecord.FileName+"] from: "+fullFilePath, false)
 	//Get File Data
 	if _, fileCheckErr := os.Stat(fullFilePath); os.IsNotExist(fileCheckErr) {
-		buffer.WriteString(loggerGen(4, "File does not exist at location."))
+		logger(4, "File does not exist at location.", false)
 		return returnStruct, false
 	}
 	//-- Load File
 	file, fileError := os.Open(fullFilePath)
 	//-- Check For Error Reading File
 	if fileError != nil {
-		buffer.WriteString(loggerGen(4, "Error Opening File: "+fmt.Sprintf("%v", fileError)))
+		logger(4, "Error Opening File: "+fmt.Sprintf("%v", fileError), false)
 		return returnStruct, false
 	}
 	defer file.Close()
@@ -171,7 +192,7 @@ func decodeSWMFile(fileRecord fileAssocStruct, espXmlmc *apiLib.XmlmcInstStruct,
 	espXmlmc.SetParam("fileContent", fileEncoded)
 	XMLEmailDecoded, xmlmcErrEmail := espXmlmc.Invoke("mail", "decodeCompositeMessage")
 	if xmlmcErrEmail != nil {
-		buffer.WriteString(loggerGen(5, "API Error response from decodeCompositeMessage: "+fmt.Sprintf("%v", xmlmcErrEmail)))
+		logger(5, "API Error response from decodeCompositeMessage: "+fmt.Sprintf("%v", xmlmcErrEmail), false)
 		return returnStruct, false
 	}
 
@@ -193,16 +214,16 @@ func decodeSWMFile(fileRecord fileAssocStruct, espXmlmc *apiLib.XmlmcInstStruct,
 	var xmlResponEmail xmlmcEmailAttachmentResponse
 	errUnmarshall := xml.Unmarshal([]byte(XMLEmailDecoded), &xmlResponEmail)
 	if errUnmarshall != nil {
-		buffer.WriteString(loggerGen(5, "Unable to read XML response from Message Decode: "+fmt.Sprintf("%v", errUnmarshall)))
+		logger(5, "Unable to read XML response from Message Decode: "+fmt.Sprintf("%v", errUnmarshall), false)
 		return returnStruct, false
 	}
 	if xmlResponEmail.MethodResult != "ok" {
-		buffer.WriteString(loggerGen(5, "Error returned from API for Message Decode: "+fmt.Sprintf("%v", xmlResponEmail.MethodResult)))
+		logger(5, "Error returned from API for Message Decode: "+fmt.Sprintf("%v", xmlResponEmail.MethodResult), false)
 		return returnStruct, false
 	}
 
 	if xmlResponEmail.Recipients == nil {
-		buffer.WriteString(loggerGen(5, "No recipients found in mail message."))
+		logger(5, "No recipients found in mail message.", false)
 		return returnStruct, false
 	}
 
@@ -242,8 +263,8 @@ func decodeSWMFile(fileRecord fileAssocStruct, espXmlmc *apiLib.XmlmcInstStruct,
 }
 
 //addFileContent - reads the file attachment from Supportworks, attach to request and update content location
-func addFileContent(entityName string, fileRecord fileAssocStruct, espXmlmc *apiLib.XmlmcInstStruct, buffer *bytes.Buffer) bool {
-	buffer.WriteString(loggerGen(1, "Adding "+fileRecord.FileName))
+func addFileContent(entityName string, fileRecord fileAssocStruct, espXmlmc *apiLib.XmlmcInstStruct) bool {
+	logger(1, "Adding "+fileRecord.FileName, false)
 
 	//Get rid of new line or carriage return characters from Base64 string
 	rexNL := regexp.MustCompile(`\r?\n`)
@@ -280,30 +301,30 @@ func addFileContent(entityName string, fileRecord fileAssocStruct, espXmlmc *api
 
 		XMLHistAtt, xmlmcErr := espXmlmc.Invoke("data", "entityAddRecord")
 		if xmlmcErr != nil {
-			buffer.WriteString(loggerGen(1, "RequestHistoricUpdateAttachments entityAddRecord Failed "+fmt.Sprintf("%s", xmlmcErr)))
+			logger(1, "RequestHistoricUpdateAttachments entityAddRecord Failed "+fmt.Sprintf("%s", xmlmcErr), false)
 			if configDebug {
-				buffer.WriteString(loggerGen(1, "RequestHistoricUpdateAttachments entityAddRecord Failed File Attachment Record XML "+XMLSTRING))
+				logger(1, "RequestHistoricUpdateAttachments entityAddRecord Failed File Attachment Record XML "+XMLSTRING, false)
 			}
 			return false
 		}
 		var xmlRespon xmlmcAttachmentResponse
 		errXMLMC := xml.Unmarshal([]byte(XMLHistAtt), &xmlRespon)
 		if errXMLMC != nil {
-			buffer.WriteString(loggerGen(4, "Unable to read response from Hornbill instance for Update File Attachment Record Insertion ["+useFileName+"] ["+fileRecord.SmCallRef+"]:"+fmt.Sprintf("%v", errXMLMC)))
+			logger(4, "Unable to read response from Hornbill instance for Update File Attachment Record Insertion ["+useFileName+"] ["+fileRecord.SmCallRef+"]:"+fmt.Sprintf("%v", errXMLMC), false)
 			if configDebug {
-				buffer.WriteString(loggerGen(1, "File Attachment Record XML "+XMLSTRING))
+				logger(1, "File Attachment Record XML "+XMLSTRING, false)
 			}
 			return false
 		}
 		if xmlRespon.MethodResult != "ok" {
-			buffer.WriteString(loggerGen(4, "Unable to process Update File Attachment Record Insertion ["+useFileName+"] ["+fileRecord.SmCallRef+"]: "+xmlRespon.State.ErrorRet))
+			logger(4, "Unable to process Update File Attachment Record Insertion ["+useFileName+"] ["+fileRecord.SmCallRef+"]: "+xmlRespon.State.ErrorRet, false)
 			if configDebug {
-				buffer.WriteString(loggerGen(1, "File Attachment Record XML "+XMLSTRING))
+				logger(1, "File Attachment Record XML "+XMLSTRING, false)
 			}
 			return false
 		}
 		if configDebug {
-			buffer.WriteString(loggerGen(1, "Historic Update File Attactment Record Insertion Success ["+useFileName+"] ["+fileRecord.SmCallRef+"]"))
+			logger(1, "Historic Update File Attactment Record Insertion Success ["+useFileName+"] ["+fileRecord.SmCallRef+"]", false)
 		}
 		attPriKey = xmlRespon.HistFileID
 	}
@@ -321,23 +342,25 @@ func addFileContent(entityName string, fileRecord fileAssocStruct, espXmlmc *api
 	var XMLSTRINGDATA = espXmlmc.GetParam()
 	XMLAttach, xmlmcErr := espXmlmc.Invoke("data", "entityAttachFile")
 	if xmlmcErr != nil {
-		buffer.WriteString(loggerGen(4, "Could not add Attachment File Data for ["+useFileName+"] ["+fileRecord.SmCallRef+"]: "+fmt.Sprintf("%v", xmlmcErr)))
-		buffer.WriteString(loggerGen(1, "File Data Record XML "+XMLSTRINGDATA))
+		logger(4, "Could not add Attachment File Data for ["+useFileName+"] ["+fileRecord.SmCallRef+"]: "+fmt.Sprintf("%v", xmlmcErr), false)
+		if configDebug {
+			logger(1, "File Data Record XML "+XMLSTRINGDATA, false)
+		}
 		return false
 	}
 	var xmlRespon xmlmcAttachmentResponse
 
 	err := xml.Unmarshal([]byte(XMLAttach), &xmlRespon)
 	if err != nil {
-		buffer.WriteString(loggerGen(4, "Could not add Attachment File Data for ["+useFileName+"] ["+fileRecord.SmCallRef+"]: "+fmt.Sprintf("%v", err)))
+		logger(4, "Could not add Attachment File Data for ["+useFileName+"] ["+fileRecord.SmCallRef+"]: "+fmt.Sprintf("%v", err), false)
 		if configDebug {
-			buffer.WriteString(loggerGen(1, "File Data Record XML "+XMLSTRINGDATA))
+			logger(1, "File Data Record XML "+XMLSTRINGDATA, false)
 		}
 	} else {
 		if xmlRespon.MethodResult != "ok" {
-			buffer.WriteString(loggerGen(4, "Could not add Attachment File Data for ["+useFileName+"] ["+fileRecord.SmCallRef+"]: "+xmlRespon.State.ErrorRet))
+			logger(4, "Could not add Attachment File Data for ["+useFileName+"] ["+fileRecord.SmCallRef+"]: "+xmlRespon.State.ErrorRet, false)
 			if configDebug {
-				buffer.WriteString(loggerGen(1, "File Data Record XML "+XMLSTRINGDATA))
+				logger(1, "File Data Record XML "+XMLSTRINGDATA, false)
 			}
 		} else {
 			//-- If we've got a Content Location back from the API, update the file record with this
@@ -375,9 +398,9 @@ func addFileContent(entityName string, fileRecord fileAssocStruct, espXmlmc *api
 				XMLSTRINGDATA = espXmlmc.GetParam()
 				XMLContentLoc, xmlmcErrContent := espXmlmc.Invoke(strService, strMethod)
 				if xmlmcErrContent != nil {
-					buffer.WriteString(loggerGen(4, "Could not update request ["+fileRecord.SmCallRef+"] with attachment ["+useFileName+"]: "+fmt.Sprintf("%v", xmlmcErrContent)))
+					logger(4, "Could not update request ["+fileRecord.SmCallRef+"] with attachment ["+useFileName+"]: "+fmt.Sprintf("%v", xmlmcErrContent), false)
 					if configDebug {
-						buffer.WriteString(loggerGen(1, "File Data Record XML "+XMLSTRINGDATA))
+						logger(1, "File Data Record XML "+XMLSTRINGDATA, false)
 					}
 					return false
 				}
@@ -385,20 +408,20 @@ func addFileContent(entityName string, fileRecord fileAssocStruct, espXmlmc *api
 
 				err = xml.Unmarshal([]byte(XMLContentLoc), &xmlResponLoc)
 				if err != nil {
-					buffer.WriteString(loggerGen(4, "Added file data to but unable to set Content Location on ["+fileRecord.SmCallRef+"] for File Content ["+useFileName+"] - read response from Hornbill instance:"+fmt.Sprintf("%v", err)))
+					logger(4, "Added file data to but unable to set Content Location on ["+fileRecord.SmCallRef+"] for File Content ["+useFileName+"] - read response from Hornbill instance:"+fmt.Sprintf("%v", err), false)
 					if configDebug {
-						buffer.WriteString(loggerGen(1, "File Data Record XML "+XMLSTRINGDATA))
+						logger(1, "File Data Record XML "+XMLSTRINGDATA, false)
 					}
 					return false
 				}
 				if xmlResponLoc.MethodResult != "ok" {
-					buffer.WriteString(loggerGen(4, "Added file data but unable to set Content Location on ["+fileRecord.SmCallRef+"] for File Content ["+useFileName+"]: "+xmlResponLoc.State.ErrorRet))
+					logger(4, "Added file data but unable to set Content Location on ["+fileRecord.SmCallRef+"] for File Content ["+useFileName+"]: "+xmlResponLoc.State.ErrorRet, false)
 					if configDebug {
-						buffer.WriteString(loggerGen(1, "File Data Record XML "+XMLSTRINGDATA))
+						logger(1, "File Data Record XML "+XMLSTRINGDATA, false)
 					}
 					return false
 				}
-				buffer.WriteString(loggerGen(1, entityName+" File Content ["+useFileName+"] Added to ["+fileRecord.SmCallRef+"] Successfully"))
+				logger(1, entityName+" File Content ["+useFileName+"] Added to ["+fileRecord.SmCallRef+"] Successfully", false)
 				counters.filesAttached++
 			}
 		}
@@ -416,7 +439,7 @@ func getSubFolderName(fileCallRef string) string {
 	return folderName
 }
 
-func getCallRefInt(callRef string, buffer *bytes.Buffer) string {
+func getCallRefInt(callRef string) string {
 	re1, err := regexp.Compile(`[0-9]+`)
 	if err != nil {
 		logger(4, "Error converting string Supportworks call reference:"+fmt.Sprintf("%v", err), false)
