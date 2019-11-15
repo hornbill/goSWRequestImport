@@ -1,5 +1,11 @@
 # CHANGELOG
 
+## 1.7.1 (November 15th, 2019)
+
+Defect fix:
+
+- Customer association messages were reported as warnings instead of debugs in the log
+
 ## 1.7.0 (November 14th, 2019)
 
 Feature:

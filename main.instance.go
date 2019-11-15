@@ -5,8 +5,9 @@ import (
 	"encoding/base64"
 	"encoding/xml"
 	"fmt"
+
 	/* non core libraries */
-	"github.com/hornbill/goApiLib"
+	apiLib "github.com/hornbill/goApiLib"
 )
 
 // espLogger -- Log to ESP
@@ -126,7 +127,7 @@ func doesCustomerExist(customerID string, espXmlmc *apiLib.XmlmcInstStruct, buff
 							customers = append(customers, customerNamedMap...)
 							mutexCustomers.Unlock()
 
-							buffer.WriteString(loggerGen(5, "Added Customer ["+customerID+"]: "+newCustomerForCache.CustomerName))
+							buffer.WriteString(loggerGen(1, "Added Customer ["+customerID+"]: "+newCustomerForCache.CustomerName))
 
 						}
 					}
@@ -157,7 +158,7 @@ func doesCustomerExist(customerID string, espXmlmc *apiLib.XmlmcInstStruct, buff
 							customers = append(customers, customerNamedMap...)
 							mutexCustomers.Unlock()
 
-							buffer.WriteString(loggerGen(5, "Added Customer ["+customerID+"].: "+newCustomerForCache.CustomerName))
+							buffer.WriteString(loggerGen(1, "Added Customer ["+customerID+"].: "+newCustomerForCache.CustomerName))
 
 						}
 					}

@@ -192,7 +192,7 @@ func decodeSWMFile(fileRecord fileAssocStruct, espXmlmc *apiLib.XmlmcInstStruct)
 	espXmlmc.SetParam("fileContent", fileEncoded)
 	XMLEmailDecoded, xmlmcErrEmail := espXmlmc.Invoke("mail", "decodeCompositeMessage")
 	if xmlmcErrEmail != nil {
-		logger(5, "API Error response from decodeCompositeMessage: "+fmt.Sprintf("%v", xmlmcErrEmail), false)
+		logger(4, "API Error response from decodeCompositeMessage: "+fmt.Sprintf("%v", xmlmcErrEmail), false)
 		return returnStruct, false
 	}
 
@@ -214,16 +214,16 @@ func decodeSWMFile(fileRecord fileAssocStruct, espXmlmc *apiLib.XmlmcInstStruct)
 	var xmlResponEmail xmlmcEmailAttachmentResponse
 	errUnmarshall := xml.Unmarshal([]byte(XMLEmailDecoded), &xmlResponEmail)
 	if errUnmarshall != nil {
-		logger(5, "Unable to read XML response from Message Decode: "+fmt.Sprintf("%v", errUnmarshall), false)
+		logger(4, "Unable to read XML response from Message Decode: "+fmt.Sprintf("%v", errUnmarshall), false)
 		return returnStruct, false
 	}
 	if xmlResponEmail.MethodResult != "ok" {
-		logger(5, "Error returned from API for Message Decode: "+fmt.Sprintf("%v", xmlResponEmail.MethodResult), false)
+		logger(4, "Error returned from API for Message Decode: "+fmt.Sprintf("%v", xmlResponEmail.MethodResult), false)
 		return returnStruct, false
 	}
 
 	if xmlResponEmail.Recipients == nil {
-		logger(5, "No recipients found in mail message.", false)
+		logger(4, "No recipients found in mail message.", false)
 		return returnStruct, false
 	}
 
