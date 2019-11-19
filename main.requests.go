@@ -98,14 +98,18 @@ func logNewCall(jobs chan RequestDetails, wg *sync.WaitGroup, espXmlmc *apiLib.X
 			strAttribute = fmt.Sprintf("%v", k)
 			strMapping = fmt.Sprintf("%v", v)
 
+			if configCustomerOrg && (strAttribute == "h_org_id" || strAttribute == "h_company_id" || strAttribute == "h_company_name") {
+				//Taking customer org/company from contact organisation or user home group - so do nothing with exiting mapping
+				continue
+			}
 			//Owning Analyst Name
 			if strAttribute == "h_ownerid" {
 				strOwnerID := getFieldValue(strMapping, callMap)
 				if strOwnerID != "" {
-					boolAnalystExists := doesAnalystExist(strOwnerID, espXmlmc, &buffer)
+					boolAnalystExists := doesUserExist(strOwnerID, espXmlmc, &buffer)
 					if boolAnalystExists {
 						//Get analyst from cache as exists
-						analystIsInCache, strOwnerName := recordInCache(strOwnerID, "Analyst")
+						analystIsInCache, strOwnerName := recordInCache(strOwnerID, "User")
 						if analystIsInCache && strOwnerName != "" {
 							coreFields[strAttribute] = strOwnerID
 							coreFields["h_ownername"] = strOwnerName
@@ -119,29 +123,45 @@ func logNewCall(jobs chan RequestDetails, wg *sync.WaitGroup, espXmlmc *apiLib.X
 			if strAttribute == "h_fk_user_id" {
 				strCustID := getFieldValue(strMapping, callMap)
 				if strCustID != "" {
-					boolCustExists := doesCustomerExist(strCustID, espXmlmc, &buffer)
-					if boolCustExists {
-						//Get customer from cache as exists
-						customerIsInCache, strCustName := recordInCache(strCustID, "Customer")
-						if customerIsInCache && strCustName != "" && strCustName != "{||||||}{||||||}" {
-							A := strings.Split(strCustName, "{||||||}")
-							coreFields[strAttribute] = A[1]
-							//fmt.Println("ID:" + A[1])
-							//fmt.Println("Name:" + A[0])
-							//fmt.Println("OrgID:" + A[2])
-							coreFields["h_fk_user_name"] = A[0]
-							if configCustomerOrg {
-								if A[2] != "" {
-									coreFields["h_org_id"] = A[2]
-									foundOrg, OrgContainerID := recordInCache(A[2], "Company")
-									//fmt.Println("ContID:" + OrgContainerID)
+					if swImportConf.CustomerType == "1" {
+						//Customer is a Contact
+						contactExists := doesContactExist(strCustID, espXmlmc, &buffer)
+						if contactExists {
+							contactInCache, contactName, contactPK, contactOrgID := contactInCache(strCustID)
+							if contactInCache && contactName != "" && contactPK != "" {
+								coreFields[strAttribute] = contactPK
+								coreFields["h_fk_user_name"] = contactName
+								if configCustomerOrg && contactOrgID != "" {
+									//Now sort out container
+									coreFields["h_org_id"] = contactOrgID
+									foundOrg, OrgContainerID := recordInCache(contactOrgID, "Organisation")
 									if foundOrg && OrgContainerID != "" {
 										coreFields["h_container_id"] = OrgContainerID
 									}
 								}
 							}
 						}
+					} else {
+						//Customer is a User
+						boolCustExists := doesUserExist(strCustID, espXmlmc, &buffer)
+						if boolCustExists {
+							//Get customer from cache as exists
+							customerIsInCache, strCustName, homeOrgID := userInCache(strCustID)
+							if customerIsInCache {
+								coreFields[strAttribute] = strCustID
+								coreFields["h_fk_user_name"] = strCustName
+								if configCustomerOrg && homeOrgID != "" {
+
+									companyFound, companyName := searchGroup(homeOrgID, espXmlmc, &buffer)
+									if companyFound {
+										coreFields["h_company_id"] = homeOrgID
+										coreFields["h_company_name"] = companyName
+									}
+								}
+							}
+						}
 					}
+
 				}
 				boolAutoProcess = false
 			}

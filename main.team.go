@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/hornbill/goApiLib"
+	apiLib "github.com/hornbill/goApiLib"
 )
 
 //getCallTeamID takes the Call Record and returns a correct Team ID if one exists on the Instance
@@ -77,15 +77,15 @@ func searchTeam(teamName string, espXmlmc *apiLib.XmlmcInstStruct, buffer *bytes
 			buffer.WriteString(loggerGen(5, "Unable to Search for Team: "+xmlRespon.State.ErrorRet))
 		} else {
 			//-- Check Response
-			if xmlRespon.TeamName != "" {
-				if strings.ToLower(xmlRespon.TeamName) == strings.ToLower(teamName) {
-					strReturn = xmlRespon.TeamID
+			if xmlRespon.Name != "" {
+				if strings.ToLower(xmlRespon.Name) == strings.ToLower(teamName) {
+					strReturn = xmlRespon.ID
 					boolReturn = true
 					//-- Add Team to Cache
-					var newTeamForCache teamListStruct
-					newTeamForCache.TeamID = strReturn
-					newTeamForCache.TeamName = teamName
-					teamNamedMap := []teamListStruct{newTeamForCache}
+					var newTeamForCache groupListStruct
+					newTeamForCache.ID = strReturn
+					newTeamForCache.Name = teamName
+					teamNamedMap := []groupListStruct{newTeamForCache}
 					mutexTeams.Lock()
 					teams = append(teams, teamNamedMap...)
 					mutexTeams.Unlock()

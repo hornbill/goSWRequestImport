@@ -9,7 +9,7 @@ import (
 )
 
 const (
-	version           = "1.7.1"
+	version           = "1.8.0"
 	appServiceManager = "com.hornbill.servicemanager"
 )
 
@@ -31,15 +31,16 @@ var (
 	espXmlmc               *apiLib.XmlmcInstStruct
 	counters               counterTypeStruct
 	mapGenericConf         swCallConfStruct
-	analysts               []analystListStruct
+	users                  []userListStruct
 	categories             []categoryListStruct
 	closeCategories        []categoryListStruct
 	customers              []customerListStruct
-	companies              []companyListStruct
+	organisations          []orgListStruct
+	companies              []groupListStruct
 	priorities             []priorityListStruct
 	services               []serviceListStruct
 	sites                  []siteListStruct
-	teams                  []teamListStruct
+	teams                  []groupListStruct
 	sqlCallQuery           string
 	swImportConf           swImportConfStruct
 	timeNow                string
@@ -52,9 +53,10 @@ var (
 	mutexBar               = &sync.Mutex{}
 	mutexCategories        = &sync.Mutex{}
 	mutexCloseCategories   = &sync.Mutex{}
+	mutexCompanies         = &sync.Mutex{}
 	mutexCounters          = &sync.Mutex{}
 	mutexCustomers         = &sync.Mutex{}
-	mutexCompanies         = &sync.Mutex{}
+	mutexOrgs              = &sync.Mutex{}
 	mutexPriorities        = &sync.Mutex{}
 	mutexServices          = &sync.Mutex{}
 	mutexSites             = &sync.Mutex{}
@@ -214,14 +216,21 @@ type xmlmcServiceListResponse struct {
 }
 
 //----- Team Structs
-type teamListStruct struct {
-	TeamName string
-	TeamID   string
+type groupListStruct struct {
+	Name string
+	ID   string
 }
+type xmlmcGroupListResponse struct {
+	MethodResult string      `xml:"status,attr"`
+	ID           string      `xml:"params>id"`
+	Name         string      `xml:"params>name"`
+	State        stateStruct `xml:"state"`
+}
+
 type xmlmcTeamListResponse struct {
 	MethodResult string      `xml:"status,attr"`
-	TeamID       string      `xml:"params>rowData>row>h_id"`
-	TeamName     string      `xml:"params>rowData>row>h_name"`
+	ID           string      `xml:"params>rowData>row>h_id"`
+	Name         string      `xml:"params>rowData>row>h_name"`
 	State        stateStruct `xml:"state"`
 }
 
@@ -239,16 +248,18 @@ type xmlmcCategoryListResponse struct {
 }
 
 //----- Analyst Structs
-type analystListStruct struct {
-	AnalystID   string
-	AnalystName string
+type userListStruct struct {
+	UserID  string
+	Name    string
+	HomeOrg string
 }
-type xmlmcAnalystListResponse struct {
-	MethodResult     string      `xml:"status,attr"`
-	AnalystFullName  string      `xml:"params>name"`
-	AnalystFirstName string      `xml:"params>firstName"`
-	AnalystLastName  string      `xml:"params>lastName"`
-	State            stateStruct `xml:"state"`
+type xmlmcUserListResponse struct {
+	MethodResult string      `xml:"status,attr"`
+	FullName     string      `xml:"params>name"`
+	FirstName    string      `xml:"params>firstName"`
+	LastName     string      `xml:"params>lastName"`
+	HomeOrg      string      `xml:"params>homeOrganization"`
+	State        stateStruct `xml:"state"`
 }
 
 //----- Customer Structs
@@ -258,16 +269,16 @@ type customerListStruct struct {
 	CustomerName       string
 	CustomerOrgID      string
 }
-type companyListStruct struct {
+type orgListStruct struct {
 	OrgID       string
 	ContainerID string
 }
 type xmlmcOrgListResponse struct {
-	MethodResult string                 `xml:"status,attr"`
-	RowResult    []xmlCompanyListStruct `xml:"params>rowData>row"`
-	State        stateStruct            `xml:"state"`
+	MethodResult string             `xml:"status,attr"`
+	RowResult    []xmlOrgListStruct `xml:"params>rowData>row"`
+	State        stateStruct        `xml:"state"`
 }
-type xmlCompanyListStruct struct {
+type xmlOrgListStruct struct {
 	OrgID       string `xml:"h_organization_id"`
 	ContainerID string `xml:"h_id"`
 }
@@ -278,14 +289,6 @@ type xmlmcContactListResponse struct {
 	CustomerLastName   string      `xml:"params>rowData>row>h_lastname"`
 	CustomerOrgID      string      `xml:"params>rowData>row>h_organization_id"`
 	CustomerHornbillID string      `xml:"params>rowData>row>h_pk_id"`
-	State              stateStruct `xml:"state"`
-}
-type xmlmcCustomerListResponse struct {
-	MethodResult       string      `xml:"status,attr"`
-	CustomerFirstName  string      `xml:"params>rowData>row>h_first_name"`
-	CustomerLastName   string      `xml:"params>rowData>row>h_last_name"`
-	CustomerOrgID      string      `xml:"params>rowData>row>h_organization_id"` // probably not used at all
-	CustomerHornbillID string      `xml:"params>rowData>row>h_user_id"`
 	State              stateStruct `xml:"state"`
 }
 

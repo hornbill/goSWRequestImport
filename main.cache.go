@@ -1,9 +1,8 @@
 package main
 
 import (
-	"strconv"
-	"fmt"
 	"encoding/xml"
+	"strconv"
 )
 
 // recordInCache -- Function to check if passed-thorugh record name has been cached
@@ -46,82 +45,94 @@ func recordInCache(recordName, recordType string) (bool, string) {
 		//-- Check if record in Team Cache
 		mutexTeams.Lock()
 		for _, team := range teams {
-			if team.TeamName == recordName {
+			if team.Name == recordName {
 				boolReturn = true
-				strReturn = team.TeamID
+				strReturn = team.ID
 			}
 		}
 		mutexTeams.Unlock()
-	case "Analyst":
-		//-- Check if record in Analyst Cache
-		mutexAnalysts.Lock()
-		for _, analyst := range analysts {
-			if analyst.AnalystID == recordName {
-				boolReturn = true
-				strReturn = analyst.AnalystName
-			}
-		}
-		mutexAnalysts.Unlock()
-	case "Customer":
-		//-- Check if record in Customer Cache
-		mutexCustomers.Lock()
-		for _, customer := range customers {
-			if customer.CustomerID == recordName {
-				boolReturn = true
-				strReturn = customer.CustomerName + "{||||||}" + customer.CustomerHornbillID + "{||||||}" + customer.CustomerOrgID
-				//strReturn = customer.CustomerHornbillID
-			}
-		}
-		mutexCustomers.Unlock()
 	case "Company":
-		//-- Check if record in Customer Cache
 		mutexCompanies.Lock()
 		for _, company := range companies {
-			if company.OrgID == recordName {
+			if company.ID == recordName {
 				boolReturn = true
-				strReturn = company.ContainerID
-				//strReturn = customer.CustomerHornbillID
+				strReturn = company.Name
 			}
 		}
 		mutexCompanies.Unlock()
+	case "Organisation":
+		//-- Check if record in Org Cache
+		mutexOrgs.Lock()
+		for _, org := range organisations {
+			if org.OrgID == recordName {
+				boolReturn = true
+				strReturn = org.ContainerID
+			}
+		}
+		mutexOrgs.Unlock()
 	}
 	return boolReturn, strReturn
 }
 
-func loadOrgs() {
+func userInCache(userID string) (inCache bool, userName, homeOrg string) {
+	inCache = false
+	userName = ""
+	homeOrg = ""
+	mutexAnalysts.Lock()
+	for _, user := range users {
+		if user.UserID == userID {
+			inCache = true
+			userName = user.Name
+			homeOrg = user.HomeOrg
+		}
+	}
+	mutexAnalysts.Unlock()
+	return
+}
 
+func contactInCache(contactID string) (inCache bool, contactName, contactPK, contactOrgID string) {
+	contactName = ""
+	contactPK = ""
+	contactOrgID = ""
+	mutexCustomers.Lock()
+	for _, customer := range customers {
+		if customer.CustomerID == contactID {
+			inCache = true
+			contactName = customer.CustomerName
+			contactPK = customer.CustomerHornbillID
+			contactOrgID = customer.CustomerOrgID
+		}
+	}
+	mutexCustomers.Unlock()
+	return
+}
+
+func loadOrgs() error {
 	espXmlmc, err := NewEspXmlmcSession()
 	if err != nil {
-		fmt.Println("AAA")
-		return
+		return err
 	}
-
 	espXmlmc.SetParam("application", appServiceManager)
 	espXmlmc.SetParam("queryName", "getOrganizationContainers")
 	XMLOrgSearch, xmlmcErr := espXmlmc.Invoke("data", "queryExec")
 	if xmlmcErr != nil {
-		return
+		return xmlmcErr
 	}
-
 	var xmlRespon xmlmcOrgListResponse
-	//fmt.Println(XMLOrgSearch)
 	err2 := xml.Unmarshal([]byte(XMLOrgSearch), &xmlRespon)
 	if err2 != nil {
-		return
+		return err2
 	}
-
-	mutexCompanies.Lock()
-
+	mutexOrgs.Lock()
 	for index := range xmlRespon.RowResult {
-		var newOrgForCache companyListStruct
+		var newOrgForCache orgListStruct
 		newOrgForCache.OrgID = xmlRespon.RowResult[index].OrgID
 		newOrgForCache.ContainerID = xmlRespon.RowResult[index].ContainerID
-		companyNamedMap := []companyListStruct{newOrgForCache}
-		companies = append(companies, companyNamedMap...)
+		orgNamedMap := []orgListStruct{newOrgForCache}
+		organisations = append(organisations, orgNamedMap...)
 	}
-
-	mutexCompanies.Unlock()
-
+	mutexOrgs.Unlock()
+	return nil
 }
 
 // categoryInCache -- Function to check if passed-thorugh category been cached

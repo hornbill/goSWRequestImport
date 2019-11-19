@@ -110,7 +110,10 @@ func main() {
 	}
 	defer dbapp.Close()
 
-	loadOrgs()
+	err = loadOrgs()
+	if err != nil {
+		logger(4, "Error when trying to cache Organisation records from instance: "+err.Error(), true)
+	}
 
 	//Get request type import config, process each in turn
 	for _, val := range swImportConf.RequestTypesToImport {

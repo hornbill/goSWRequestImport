@@ -1,5 +1,18 @@
 # CHANGELOG
 
+## 1.8.0 (November 19th, 2019)
+
+Changes:
+
+- Updated Site search to use h_site mapping value instead of h_site_id
+- Changed CLI parameter name from contactOrg to custorg, to reflect additional features below when using this flag
+- With the above flag being set to true, if the customer being imported is of type User, the tool will now use the users Home Organisation as the Company on logged requests
+- Skip mapping of h_org_id, h_company_id and h_company_name if the above flag is set, so we don't overwrite the discovered values with mapped values
+
+Defect Fix:
+
+- When the customer being imported is of type Contact, the tool was not always using the contacts primary organisation as the Organisation on logged requests
+
 ## 1.7.1 (November 15th, 2019)
 
 Defect fix:

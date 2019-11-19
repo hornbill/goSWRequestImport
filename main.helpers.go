@@ -211,7 +211,7 @@ func parseFlags() {
 	flag.BoolVar(&configDryRun, "dryrun", false, "Dump import XML to log instead of creating requests")
 	flag.BoolVar(&configDebug, "debug", false, "Additional logging for debugging.")
 	flag.StringVar(&configMaxRoutines, "concurrent", "1", "Maximum number of requests to import concurrently.")
-	flag.BoolVar(&configCustomerOrg, "contactOrg", false, "Adopt Contact Organisation for the call")
+	flag.BoolVar(&configCustomerOrg, "custorg", false, "Adopt Contact Organisation or User Company for the call rather than mapped values")
 	flag.BoolVar(&boolProcessAttachments, "attachments", false, "Import attachemnts without prompting.")
 	flag.BoolVar(&configVersion, "version", false, "Returns the version of the tool before exiting")
 	flag.Parse()

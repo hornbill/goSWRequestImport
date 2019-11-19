@@ -7,13 +7,13 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/hornbill/goApiLib"
+	apiLib "github.com/hornbill/goApiLib"
 )
 
 //getSiteID takes the Call Record and returns a correct Site ID if one exists on the Instance
 func getSiteID(callMap map[string]interface{}, espXmlmc *apiLib.XmlmcInstStruct, buffer *bytes.Buffer) (string, string) {
 	siteID := ""
-	siteNameMapping := fmt.Sprintf("%v", mapGenericConf.CoreFieldMapping["h_site_id"])
+	siteNameMapping := fmt.Sprintf("%v", mapGenericConf.CoreFieldMapping["h_site"])
 	siteName := getFieldValue(siteNameMapping, callMap)
 	if siteName != "" {
 		siteIsInCache, SiteIDCache := recordInCache(siteName, "Site")

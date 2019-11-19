@@ -19,154 +19,106 @@ func espLogger(message, severity string) {
 	espXmlmc.Invoke("system", "logMessage")
 }
 
-//doesAnalystExist takes an Analyst ID string and returns a true if one exists in the cache or on the Instance
-func doesAnalystExist(analystID string, espXmlmc *apiLib.XmlmcInstStruct, buffer *bytes.Buffer) bool {
-
-	boolAnalystExists := false
-	if analystID != "" {
-		analystIsInCache, strReturn := recordInCache(analystID, "Analyst")
+//doesUserExist takes an User ID string and returns a true if one exists in the cache or on the Instance
+func doesUserExist(userID string, espXmlmc *apiLib.XmlmcInstStruct, buffer *bytes.Buffer) bool {
+	boolUserExists := false
+	if userID != "" {
+		userInCache, userName, _ := userInCache(userID)
 		//-- Check if we have cached the Analyst already
-		if analystIsInCache && strReturn != "" {
-			boolAnalystExists = true
+		if userInCache && userName != "" {
+			boolUserExists = true
 		} else {
 			//Get Analyst Info
-			espXmlmc.SetParam("userId", analystID)
+			espXmlmc.SetParam("userId", userID)
 
 			XMLAnalystSearch, xmlmcErr := espXmlmc.Invoke("admin", "userGetInfo")
 			if xmlmcErr != nil {
-				buffer.WriteString(loggerGen(4, "Unable to Search for Request Owner ["+analystID+"]: "+fmt.Sprintf("%v", xmlmcErr)))
+				buffer.WriteString(loggerGen(4, "Unable to Search for User ["+userID+"]: "+fmt.Sprintf("%v", xmlmcErr)))
 			}
 
-			var xmlRespon xmlmcAnalystListResponse
+			var xmlRespon xmlmcUserListResponse
 			err := xml.Unmarshal([]byte(XMLAnalystSearch), &xmlRespon)
 			if err != nil {
-				buffer.WriteString(loggerGen(4, "Unable to Search for Request Owner ["+analystID+"]: "+fmt.Sprintf("%v", err)))
+				buffer.WriteString(loggerGen(4, "Unable to Search for User ["+userID+"]: "+fmt.Sprintf("%v", err)))
 			} else {
 				if xmlRespon.MethodResult != "ok" {
 					//Analyst most likely does not exist
-					buffer.WriteString(loggerGen(5, "Unable to Search for Request Owner ["+analystID+"]: "+xmlRespon.State.ErrorRet))
+					buffer.WriteString(loggerGen(5, "Unable to Search for User ["+userID+"]: "+xmlRespon.State.ErrorRet))
 				} else {
 					//-- Check Response
-					if xmlRespon.AnalystFullName != "" {
-						boolAnalystExists = true
+					if xmlRespon.FullName != "" {
+						boolUserExists = true
 						//-- Add Analyst to Cache
-						var newAnalystForCache analystListStruct
-						newAnalystForCache.AnalystID = analystID
-						newAnalystForCache.AnalystName = xmlRespon.AnalystFullName
-						analystNamedMap := []analystListStruct{newAnalystForCache}
+						var userForCache userListStruct
+						userForCache.UserID = userID
+						userForCache.Name = xmlRespon.FullName
+						userForCache.HomeOrg = xmlRespon.HomeOrg
+						userNamedMap := []userListStruct{userForCache}
 						mutexAnalysts.Lock()
-						analysts = append(analysts, analystNamedMap...)
+						users = append(users, userNamedMap...)
 						mutexAnalysts.Unlock()
 					}
 				}
 			}
 		}
 	}
-	return boolAnalystExists
+	return boolUserExists
 }
 
-//doesCustomerExist takes a Customer ID string and returns a true if one exists in the cache or on the Instance
-func doesCustomerExist(customerID string, espXmlmc *apiLib.XmlmcInstStruct, buffer *bytes.Buffer) bool {
-	boolCustomerExists := false
+//doesContactExist takes a Contact ID string and returns a true if one exists in the cache or on the Instance
+func doesContactExist(contactID string, espXmlmc *apiLib.XmlmcInstStruct, buffer *bytes.Buffer) bool {
+	contactExists := false
 
-	if customerID != "" {
-		customerIsInCache, strReturn := recordInCache(customerID, "Customer")
+	if contactID != "" {
+		customerIsInCache, contactName, _, _ := contactInCache(contactID)
 		//-- Check if we have cached the Analyst already
-		if customerIsInCache && strReturn != "" {
-			boolCustomerExists = true
+		if customerIsInCache && contactName != "" {
+			return true
+		}
+		//Get Analyst Info
+		espXmlmc.SetParam("entity", "Contact")
+		espXmlmc.SetParam("matchScope", "all")
+		espXmlmc.OpenElement("searchFilter")
+		espXmlmc.SetParam("column", "h_logon_id")
+		espXmlmc.SetParam("value", contactID)
+		espXmlmc.SetParam("matchType", "exact")
+		espXmlmc.CloseElement("searchFilter")
+		espXmlmc.SetParam("maxResults", "1")
+		XMLCustomerSearch, xmlmcErr := espXmlmc.Invoke("data", "entityBrowseRecords2")
+		if xmlmcErr != nil {
+			buffer.WriteString(loggerGen(4, "Unable to Search for Contact ["+contactID+"]: "+fmt.Sprintf("%v", xmlmcErr)))
+		}
+		var xmlRespon xmlmcContactListResponse
+
+		err := xml.Unmarshal([]byte(XMLCustomerSearch), &xmlRespon)
+		if err != nil {
+			buffer.WriteString(loggerGen(4, "Unable to Search for Contact ["+contactID+"]: "+fmt.Sprintf("%v", err)))
 		} else {
-			//Get Analyst Info
-			if swImportConf.CustomerType == "1" {
-				espXmlmc.SetParam("entity", "Contact")
+			if xmlRespon.MethodResult != "ok" {
+				//Customer most likely does not exist
+				buffer.WriteString(loggerGen(5, "Unable to Search for Contact ["+contactID+"]: "+xmlRespon.State.ErrorRet))
 			} else {
-				espXmlmc.SetParam("entity", "UserAccount")
-			}
-			espXmlmc.SetParam("matchScope", "all")
+				//-- Check Response
+				if xmlRespon.CustomerFirstName != "" {
+					contactExists = true
+					//-- Add Customer to Cache
+					var newCustomerForCache customerListStruct
+					newCustomerForCache.CustomerID = contactID
+					newCustomerForCache.CustomerHornbillID = xmlRespon.CustomerHornbillID
+					newCustomerForCache.CustomerOrgID = xmlRespon.CustomerOrgID
+					newCustomerForCache.CustomerName = xmlRespon.CustomerFirstName + " " + xmlRespon.CustomerLastName
+					customerNamedMap := []customerListStruct{newCustomerForCache}
+					mutexCustomers.Lock()
+					customers = append(customers, customerNamedMap...)
+					mutexCustomers.Unlock()
 
-			espXmlmc.OpenElement("searchFilter")
-			if swImportConf.CustomerType == "1" {
-				espXmlmc.SetParam("column", "h_logon_id")
-			} else {
-				espXmlmc.SetParam("column", "h_user_id")
-			}
-			espXmlmc.SetParam("value", customerID)
-			espXmlmc.SetParam("matchType", "exact")
-			espXmlmc.CloseElement("searchFilter")
-			espXmlmc.SetParam("maxResults", "1")
-			//fmt.Println(espXmlmc.GetParam())
-			//fmt.Println(swImportConf.CustomerType)
+					buffer.WriteString(loggerGen(1, "Added Contact ["+contactID+"]: "+newCustomerForCache.CustomerName))
 
-			XMLCustomerSearch, xmlmcErr := espXmlmc.Invoke("data", "entityBrowseRecords2")
-			if xmlmcErr != nil {
-				buffer.WriteString(loggerGen(4, "Unable to Search for Customer ["+customerID+"]: "+fmt.Sprintf("%v", xmlmcErr)))
-			}
-			//fmt.Println(XMLCustomerSearch)
-			//xmlRespon := nil
-			if swImportConf.CustomerType == "1" {
-				var xmlRespon xmlmcContactListResponse
-
-				err := xml.Unmarshal([]byte(XMLCustomerSearch), &xmlRespon)
-				if err != nil {
-					buffer.WriteString(loggerGen(4, "Unable to Search for Customer ["+customerID+"]: "+fmt.Sprintf("%v", err)))
-				} else {
-					if xmlRespon.MethodResult != "ok" {
-						//Customer most likely does not exist
-						buffer.WriteString(loggerGen(5, "Unable to Search for Customer ["+customerID+"]: "+xmlRespon.State.ErrorRet))
-					} else {
-						//-- Check Response
-						if xmlRespon.CustomerFirstName != "" {
-							boolCustomerExists = true
-							//-- Add Customer to Cache
-							var newCustomerForCache customerListStruct
-							newCustomerForCache.CustomerID = customerID
-							newCustomerForCache.CustomerHornbillID = xmlRespon.CustomerHornbillID
-							newCustomerForCache.CustomerOrgID = xmlRespon.CustomerOrgID
-							newCustomerForCache.CustomerName = xmlRespon.CustomerFirstName + " " + xmlRespon.CustomerLastName
-							customerNamedMap := []customerListStruct{newCustomerForCache}
-							mutexCustomers.Lock()
-							customers = append(customers, customerNamedMap...)
-							mutexCustomers.Unlock()
-
-							buffer.WriteString(loggerGen(1, "Added Customer ["+customerID+"]: "+newCustomerForCache.CustomerName))
-
-						}
-					}
-				}
-
-			} else {
-				var xmlRespon xmlmcCustomerListResponse
-
-				err := xml.Unmarshal([]byte(XMLCustomerSearch), &xmlRespon)
-				if err != nil {
-					buffer.WriteString(loggerGen(4, "Unable to Search for Customer ["+customerID+"].: "+fmt.Sprintf("%v", err)))
-				} else {
-					if xmlRespon.MethodResult != "ok" {
-						//Customer most likely does not exist
-						buffer.WriteString(loggerGen(5, "Unable to Search for Customer ["+customerID+"].: "+xmlRespon.State.ErrorRet))
-					} else {
-						//-- Check Response
-						if xmlRespon.CustomerFirstName != "" {
-							boolCustomerExists = true
-							//-- Add Customer to Cache
-							var newCustomerForCache customerListStruct
-							newCustomerForCache.CustomerID = customerID
-							newCustomerForCache.CustomerOrgID = xmlRespon.CustomerOrgID
-							newCustomerForCache.CustomerHornbillID = xmlRespon.CustomerHornbillID
-							newCustomerForCache.CustomerName = xmlRespon.CustomerFirstName + " " + xmlRespon.CustomerLastName
-							customerNamedMap := []customerListStruct{newCustomerForCache}
-							mutexCustomers.Lock()
-							customers = append(customers, customerNamedMap...)
-							mutexCustomers.Unlock()
-
-							buffer.WriteString(loggerGen(1, "Added Customer ["+customerID+"].: "+newCustomerForCache.CustomerName))
-
-						}
-					}
 				}
 			}
 		}
 	}
-	return boolCustomerExists
+	return contactExists
 }
 
 //NewEspXmlmcSession - New Xmlmc Session variable (Cloned Session)

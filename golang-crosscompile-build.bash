@@ -11,10 +11,10 @@ version=${versiond//./_}
 #Remove White Space
 version=${version// /}
 versiond=${versiond// /}
-#platforms="darwin/386 darwin/amd64 freebsd/386 freebsd/amd64 freebsd/arm linux/386 linux/amd64 linux/arm windows/386 windows/amd64"
 platforms="windows/386 windows/amd64 linux/386 linux/amd64 linux/arm darwin/386 darwin/amd64"
 printf " ---- Building Supportworks Request Import $versiond ---- \n"
-
+rm -rf "release/"
+mkdir release
 printf "\n"
 for platform in ${platforms}
 do
@@ -50,7 +50,7 @@ do
         os="osx"
     fi
     zip -r "${package}_${os}_${arch}_v${version}.zip" $output LICENSE.md README.md conf.json > /dev/null
-    cp "${package}_${os}_${arch}_v${version}.zip" "../../../${package}_${os}_${arch}_v${version}.zip"
+    cp "${package}_${os}_${arch}_v${version}.zip" "../../../release/${package}_${os}_${arch}_v${version}.zip"
     cd "../../../"
     printf "\n"
 done
