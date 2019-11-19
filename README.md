@@ -742,6 +742,7 @@ Command Line Parameters
 * dryrun - Defaults to `false` - Set to True and the XMLMC for new request creation will not be called and instead the XML will be dumped to the log file, this is to aid in debugging the initial connection information.
 * debug - Defailts to `false` - set to true to increase debug logging output
 * concurrent - defaults to `1`. This is to specify the number of requests that should be imported concurrently, and can be an integer between 1 and 10 (inclusive). 1 is the slowest level of import, but does not affect performance of your Hornbill instance, and 10 will process the import much more quickly but could affect performance.
+* custorg - defaults to `false` - When set to `true`, the company and organisation mappings will be ignored, and the tool will use the Contacts Organisation (if the customer is of type Contact (1)), or the Users Home Organisation (if the customer is of type User (0)), when logging the requests
 
 # Testing
 If you run the application with the argument dryrun=true then no requests will be logged - the XML used to raise requests will instead be saved in to the log file so you can ensure the data mappings are correct before running the import.
