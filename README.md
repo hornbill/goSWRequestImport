@@ -109,7 +109,7 @@ Example JSON File:
         "h_ownerid":"[owner]",
         "h_fk_team_id":"[suppgroup]",
         "h_fk_priorityid":"",
-        "h_site_id":"[site]",
+        "h_site":"[site]",
         "h_company_id":"",
         "h_company_name":"",
         "h_withinfix":"[withinfix]",
@@ -186,7 +186,7 @@ Example JSON File:
         "h_ownerid":"[owner]",
         "h_fk_team_id":"[suppgroup]",
         "h_fk_priorityid":"",
-        "h_site_id":"[site]",
+        "h_site":"[site]",
         "h_company_id":"",
         "h_company_name":"",
         "h_withinfix":"[withinfix]",
@@ -263,7 +263,7 @@ Example JSON File:
         "h_ownerid":"[owner]",
         "h_fk_team_id":"[suppgroup]",
         "h_fk_priorityid":"",
-        "h_site_id":"[site]",
+        "h_site":"[site]",
         "h_company_id":"",
         "h_company_name":"",
         "h_withinfix":"[withinfix]",
@@ -336,7 +336,7 @@ Example JSON File:
         "h_ownerid":"[owner]",
         "h_fk_team_id":"[suppgroup]",
         "h_fk_priorityid":"",
-        "h_site_id":"[site]",
+        "h_site":"[site]",
         "h_company_id":"",
         "h_company_name":"",
         "h_withinfix":"[withinfix]",
@@ -413,7 +413,7 @@ Example JSON File:
         "h_ownerid":"[owner]",
         "h_fk_team_id":"[suppgroup]",
         "h_fk_priorityid":"",
-        "h_site_id":"[site]",
+        "h_site":"[site]",
         "h_company_id":"",
         "h_company_name":"",
         "h_withinfix":"[withinfix]",
@@ -487,7 +487,7 @@ Example JSON File:
         "h_ownerid":"[owner]",
         "h_fk_team_id":"[suppgroup]",
         "h_fk_priorityid":"",
-        "h_site_id":"[site]",
+        "h_site":"[site]",
         "h_company_id":"",
         "h_company_name":"",
         "h_withinfix":"[withinfix]",
@@ -563,7 +563,7 @@ Example JSON File:
         "h_ownerid":"[owner]",
         "h_fk_team_id":"[suppgroup]",
         "h_fk_priorityid":"",
-        "h_site_id":"[site]",
+        "h_site":"[site]",
         "h_company_id":"",
         "h_company_name":"",
         "h_withinfix":"[withinfix]",
@@ -708,7 +708,7 @@ A JSON array of objects that contain request-type specific configuration.
 * - Any Hornbill Date Field being populated should have an EPOCH value passed to it. This includes h_datelogged, h_dateresolved and h_dateclosed.
 * -- "h_dateclosed":"[closedatex]", - opencall.closedatex is used in Supportworks to hold the date a request will come off hold. This must be populated if you are importing requests in an On-Hold status.
 * Core Fields that can resolve associated record from passed-through value:   
-* -- "h_site_id":"[site]", - When a string is passed to the site field, the script attempts to resolve the given site name against the Site entity, and populates the request with the correct site information. If the site cannot be resolved, the site details are not populated for the request being imported.
+* -- "h_site":"[site]", - When a string is passed to the site field, the script attempts to resolve the given site name against the Site entity, and populates the request with the correct site information. If the site cannot be resolved, the site details are not populated for the request being imported.
 * -- "h_fk_user_id":"[cust_id]", - As site, above, but resolves the original request customer against the users or contacts within Hornbill.
 * -- "h_ownerid":"[owner]", - As site, above, but resolves the original request owner against the analysts within Hornbill.
 * -- "h_category_id":"[probcode]", - As site, above, but uses additional CategoryMapping from the configuration, as detailed below.
