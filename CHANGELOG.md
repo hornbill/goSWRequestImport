@@ -1,5 +1,11 @@
 # CHANGELOG
 
+## 1.8.1 (November 21st, 2019)
+
+Defect Fix:
+
+- Issue resolving sites from mapped site name
+
 ## 1.8.0 (November 19th, 2019)
 
 Changes:

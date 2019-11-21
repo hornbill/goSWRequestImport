@@ -257,12 +257,12 @@ func logNewCall(jobs chan RequestDetails, wg *sync.WaitGroup, espXmlmc *apiLib.X
 			}
 
 			// Site ID and Name
-			if strAttribute == "h_site_id" {
+			if strAttribute == "h_site" {
 				//-- Get site ID
 				siteID, siteName := getSiteID(callMap, espXmlmc, &buffer)
 				if siteID != "" && siteName != "" {
-					coreFields[strAttribute] = siteID
-					coreFields["h_site"] = siteName
+					coreFields["h_site_id"] = siteID
+					coreFields[strAttribute] = siteName
 				}
 				boolAutoProcess = false
 			}
@@ -319,7 +319,7 @@ func logNewCall(jobs chan RequestDetails, wg *sync.WaitGroup, espXmlmc *apiLib.X
 				strAttribute != "h_closure_category" &&
 				strAttribute != "h_fk_servicename" &&
 				strAttribute != "h_fk_team_name" &&
-				strAttribute != "h_site" &&
+				strAttribute != "h_site_id" &&
 				strAttribute != "h_fk_priorityname" &&
 				strAttribute != "h_ownername" &&
 				strAttribute != "h_fk_user_name" &&
