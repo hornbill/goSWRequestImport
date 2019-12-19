@@ -1,5 +1,13 @@
 # CHANGELOG
 
+## 1.9.0 (December 19th, 2019)
+
+Changes:
+
+- Extended logging when -debug=true CLI flag is set
+- Fixed intermittent issue with the updating of the log date
+- Fixed intermittent issue with the updating of calls to an on-hold status
+
 ## 1.8.1 (November 21st, 2019)
 
 Defect Fix:

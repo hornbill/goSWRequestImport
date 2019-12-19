@@ -82,16 +82,39 @@ func logNewCall(jobs chan RequestDetails, wg *sync.WaitGroup, espXmlmc *apiLib.X
 		statusMapping := fmt.Sprintf("%v", mapGenericConf.CoreFieldMapping["h_status"])
 		strStatusID := getFieldValue(statusMapping, callMap)
 		if swImportConf.StatusMapping[strStatusID] != nil {
-			strStatus = fmt.Sprintf("%v", swImportConf.StatusMapping[strStatusID])
+			strStatus = strings.ToLower(fmt.Sprintf("%v", swImportConf.StatusMapping[strStatusID]))
 		}
 
 		coreFields := make(map[string]string)
 		strAttribute := ""
 		strMapping := ""
 		strServiceBPM := ""
+
 		boolUpdateLogDate := false
 		strLoggedDate := ""
+		//Sort out logged date
+		if logDateInterface, ok := mapGenericConf.CoreFieldMapping["h_datelogged"]; ok {
+			if logDateInterface != "" {
+				logDateMapping := fmt.Sprint(mapGenericConf.CoreFieldMapping["h_datelogged"])
+				loggedEPOCH := getFieldValue(logDateMapping, callMap)
+				if loggedEPOCH != "" && loggedEPOCH != "0" {
+					strLoggedDate = epochToDateTime(loggedEPOCH)
+					boolUpdateLogDate = true
+				}
+			}
+		}
+
+		//Sort out closed date
 		strClosedDate := ""
+		if closeDateInterface, ok := mapGenericConf.CoreFieldMapping["h_dateclosed"]; ok {
+			if closeDateInterface != "" {
+				closeDateMapping := fmt.Sprint(mapGenericConf.CoreFieldMapping["h_dateclosed"])
+				closedEPOCH := getFieldValue(closeDateMapping, callMap)
+				if closedEPOCH != "" && closedEPOCH != "0" {
+					strClosedDate = epochToDateTime(closedEPOCH)
+				}
+			}
+		}
 		//Loop through core fields from config, add to XMLMC Params
 		for k, v := range mapGenericConf.CoreFieldMapping {
 			boolAutoProcess := true
@@ -279,35 +302,18 @@ func logNewCall(jobs chan RequestDetails, wg *sync.WaitGroup, espXmlmc *apiLib.X
 			}
 
 			// Closed Date/Time
-			if strAttribute == "h_dateclosed" && strMapping != "" && (strStatus == "status.resolved" || strStatus == "status.closed" || strStatus == "status.onHold") {
-				closedEPOCH := getFieldValue(strMapping, callMap)
-				if closedEPOCH != "" && closedEPOCH != "0" {
-					strClosedDate = epochToDateTime(closedEPOCH)
-					if strClosedDate != "" && strStatus != "status.onHold" {
-						coreFields[strAttribute] = strClosedDate
-					}
-				}
+			if strAttribute == "h_dateclosed" && strClosedDate != "" && strStatus != "status.onhold" {
+				coreFields[strAttribute] = strClosedDate
 			}
 
 			// Request Status
 			if strAttribute == "h_status" {
-				if strStatus == "status.onHold" {
+				if strStatus == "status.onhold" {
 					strStatus = "status.open"
 					boolOnHoldRequest = true
 				}
 				coreFields[strAttribute] = strStatus
 				boolAutoProcess = false
-			}
-
-			// Log Date/Time - setup ready to be processed after call logged
-			if strAttribute == "h_datelogged" && strMapping != "" {
-				loggedEPOCH := getFieldValue(strMapping, callMap)
-				if loggedEPOCH != "" && loggedEPOCH != "0" {
-					strLoggedDate = epochToDateTime(loggedEPOCH)
-					if strLoggedDate != "" {
-						boolUpdateLogDate = true
-					}
-				}
 			}
 
 			//Everything Else
@@ -396,6 +402,9 @@ func logNewCall(jobs chan RequestDetails, wg *sync.WaitGroup, espXmlmc *apiLib.X
 		//-- Check for Dry Run
 		if configDryRun != true {
 			//XMLRequest := espXmlmc.GetParam()
+			if configDebug {
+				buffer.WriteString(loggerGen(1, "entityAddRecord::Requests:"+espXmlmc.GetParam()))
+			}
 			XMLCreate, xmlmcErr := espXmlmc.Invoke("data", "entityAddRecord")
 			if xmlmcErr != nil {
 				buffer.WriteString(loggerGen(4, xmlmcErr.Error()))
@@ -433,6 +442,9 @@ func logNewCall(jobs chan RequestDetails, wg *sync.WaitGroup, espXmlmc *apiLib.X
 				espXmlmc.SetParam("content", "Request imported from Supportworks")
 				espXmlmc.SetParam("visibility", "public")
 				espXmlmc.SetParam("type", "Logged")
+				if configDebug {
+					buffer.WriteString(loggerGen(1, "activity::postMessage:"+espXmlmc.GetParam()))
+				}
 				fixed, err := espXmlmc.Invoke("activity", "postMessage")
 				if err != nil {
 					buffer.WriteString(loggerGen(5, "Activity Stream Creation failed for Request ["+strNewCallRef+"]"))
@@ -452,7 +464,6 @@ func logNewCall(jobs chan RequestDetails, wg *sync.WaitGroup, espXmlmc *apiLib.X
 
 				//Now update Logdate
 				if boolUpdateLogDate {
-					espXmlmc.ClearParam()
 					espXmlmc.SetParam("application", appServiceManager)
 					espXmlmc.SetParam("entity", "Requests")
 					espXmlmc.OpenElement("primaryEntityData")
@@ -461,6 +472,9 @@ func logNewCall(jobs chan RequestDetails, wg *sync.WaitGroup, espXmlmc *apiLib.X
 					espXmlmc.SetParam("h_datelogged", strLoggedDate)
 					espXmlmc.CloseElement("record")
 					espXmlmc.CloseElement("primaryEntityData")
+					if configDebug {
+						buffer.WriteString(loggerGen(1, "entityUpdateRecord::Requests::logDate:"+espXmlmc.GetParam()))
+					}
 					XMLLogDate, xmlmcErr := espXmlmc.Invoke("data", "entityUpdateRecord")
 					if xmlmcErr != nil {
 						buffer.WriteString(loggerGen(4, "Unable to update Log Date of request ["+strNewCallRef+"] : "+fmt.Sprintf("%v", xmlmcErr)))
@@ -482,13 +496,15 @@ func logNewCall(jobs chan RequestDetails, wg *sync.WaitGroup, espXmlmc *apiLib.X
 					strStatus != "status.cancelled" {
 
 					if strNewCallRef != "" && strServiceBPM != "" {
-						espXmlmc.ClearParam()
 						espXmlmc.SetParam("application", appServiceManager)
 						espXmlmc.SetParam("name", strServiceBPM)
 						espXmlmc.OpenElement("inputParams")
 						espXmlmc.SetParam("objectRefUrn", "urn:sys:entity:"+appServiceManager+":Requests:"+strNewCallRef)
 						espXmlmc.SetParam("requestId", strNewCallRef)
 						espXmlmc.CloseElement("inputParams")
+						if configDebug {
+							buffer.WriteString(loggerGen(1, "bpm::processSpawn:"+espXmlmc.GetParam()))
+						}
 						XMLBPM, xmlmcErr := espXmlmc.Invoke("bpm", "processSpawn")
 						if xmlmcErr != nil {
 							//log.Fatal(xmlmcErr)
@@ -512,7 +528,9 @@ func logNewCall(jobs chan RequestDetails, wg *sync.WaitGroup, espXmlmc *apiLib.X
 							espXmlmc.SetParam("h_bpm_id", xmlRespon.Identifier)
 							espXmlmc.CloseElement("record")
 							espXmlmc.CloseElement("primaryEntityData")
-
+							if configDebug {
+								buffer.WriteString(loggerGen(1, "entityUpdateRecord::Requests::bpmId:"+espXmlmc.GetParam()))
+							}
 							XMLBPMUpdate, xmlmcErr := espXmlmc.Invoke("data", "entityUpdateRecord")
 							if xmlmcErr != nil {
 								buffer.WriteString(loggerGen(4, "Unable to associated spawned BPM to request ["+strNewCallRef+"]: "+fmt.Sprintf("%v", xmlmcErr)))
@@ -535,6 +553,9 @@ func logNewCall(jobs chan RequestDetails, wg *sync.WaitGroup, espXmlmc *apiLib.X
 					espXmlmc.SetParam("requestId", strNewCallRef)
 					espXmlmc.SetParam("onHoldUntil", strClosedDate)
 					espXmlmc.SetParam("strReason", "Request imported from Supportworks in an On Hold status. See Historical Request Updates for further information.")
+					if configDebug {
+						buffer.WriteString(loggerGen(1, "OnHoldXMLMC: "+espXmlmc.GetParam()))
+					}
 					XMLBPM, xmlmcErr := espXmlmc.Invoke("apps/"+appServiceManager+"/Requests", "holdRequest")
 					if xmlmcErr != nil {
 						//log.Fatal(xmlmcErr)
