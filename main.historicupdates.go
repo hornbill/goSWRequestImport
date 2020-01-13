@@ -6,8 +6,9 @@ import (
 	"fmt"
 	"html"
 	"strconv"
+	"strings"
 
-	"github.com/hornbill/goApiLib"
+	apiLib "github.com/hornbill/goApiLib"
 	"github.com/hornbill/sqlx"
 )
 
@@ -19,30 +20,21 @@ func applyHistoricalUpdates(request RequestReferences, espXmlmc *apiLib.XmlmcIns
 
 	db2, err := sqlx.Open(appDBDriver, connStrAppDB)
 	if err != nil {
-		logger(4, "[DATABASE] Database Connection Error: "+fmt.Sprintf("%v", err), true)
+		logger(4, "[DATABASE] Database Connection Error: "+err.Error(), true)
 		return
 	}
 	defer db2.Close()
-
+	diaryQuery := strings.ReplaceAll(swImportConf.CallDiaryQuery, "[sourceref]", swCallRef)
 	if configDebug {
 		buffer.WriteString(loggerGen(3, "[DATABASE] Connection Successful"))
-	}
-	mutex.Lock()
-	if configDebug {
 		buffer.WriteString(loggerGen(3, "[DATABASE] Running query for Historical Updates of call "+swCallRef+". Please wait..."))
+		buffer.WriteString(loggerGen(3, "[DATABASE] Diary Query: "+diaryQuery))
 	}
-	//build query
-	sqlDiaryQuery := "SELECT updatetimex, repid, groupid, udsource, udcode, udtype, updatetxt, udindex, timespent "
-	sqlDiaryQuery = sqlDiaryQuery + " FROM updatedb WHERE callref = " + swCallRef
-	if configDebug {
-		buffer.WriteString(loggerGen(3, "[DATABASE] Diary Query: "+sqlDiaryQuery))
-	}
-	mutex.Unlock()
 
 	//Run Query
-	rows, err := db2.Queryx(sqlDiaryQuery)
+	rows, err := db2.Queryx(diaryQuery)
 	if err != nil {
-		buffer.WriteString(loggerGen(4, " Database Query Error: "+fmt.Sprintf("%v", err)))
+		buffer.WriteString(loggerGen(4, " Database Query Error: "+err.Error()))
 		return
 	}
 	defer rows.Close()
@@ -53,7 +45,7 @@ func applyHistoricalUpdates(request RequestReferences, espXmlmc *apiLib.XmlmcIns
 		diaryEntry := make(map[string]interface{})
 		err = rows.MapScan(diaryEntry)
 		if err != nil {
-			buffer.WriteString(loggerGen(4, "Unable to retrieve data from SQL query: "+fmt.Sprintf("%v", err)))
+			buffer.WriteString(loggerGen(4, "Unable to retrieve data from SQL query: "+err.Error()))
 			errCount++
 		} else {
 			//Update Time - EPOCH to Date/Time Conversion
@@ -126,9 +118,15 @@ func applyHistoricalUpdates(request RequestReferences, espXmlmc *apiLib.XmlmcIns
 			}
 			espXmlmc.SetParam("h_updatebytype", "1")
 			espXmlmc.SetParam("h_updateindex", diaryIndex)
-			espXmlmc.SetParam("h_updateby", fmt.Sprintf("%+s", diaryEntry["repid"]))
-			espXmlmc.SetParam("h_updatebyname", fmt.Sprintf("%+s", diaryEntry["repid"]))
-			espXmlmc.SetParam("h_updatebygroup", fmt.Sprintf("%+s", diaryEntry["groupid"]))
+			if diaryEntry["repid"] != nil {
+				espXmlmc.SetParam("h_updateby", fmt.Sprintf("%+s", diaryEntry["repid"]))
+			}
+			if diaryEntry["repid"] != nil {
+				espXmlmc.SetParam("h_updatebyname", fmt.Sprintf("%+s", diaryEntry["repid"]))
+			}
+			if diaryEntry["groupid"] != nil {
+				espXmlmc.SetParam("h_updatebygroup", fmt.Sprintf("%+s", diaryEntry["groupid"]))
+			}
 			if diaryCode != "" {
 				espXmlmc.SetParam("h_actiontype", diaryCode)
 			}
@@ -141,6 +139,9 @@ func applyHistoricalUpdates(request RequestReferences, espXmlmc *apiLib.XmlmcIns
 			espXmlmc.CloseElement("record")
 			espXmlmc.CloseElement("primaryEntityData")
 
+			if configDebug {
+				buffer.WriteString(loggerGen(3, "XMLMC data::entityAddRecord::RequestHistoricUpdates: "+espXmlmc.GetParam()))
+			}
 			XMLUpdate, xmlmcErr := espXmlmc.Invoke("data", "entityAddRecord")
 			if xmlmcErr != nil {
 				buffer.WriteString(loggerGen(3, "API Invoke Failed Unable to add Historical Call Diary Update: "+fmt.Sprintf("%v", xmlmcErr)))

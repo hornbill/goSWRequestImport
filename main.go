@@ -82,13 +82,15 @@ func main() {
 		return
 	}
 
-	//-- Log in to Hornbill instance
-	var boolLogin = login()
-	if boolLogin != true {
-		return
+	if swImportConf.HBConf.APIKey == "" {
+		//-- Log in to Hornbill instance
+		var boolLogin = login()
+		if boolLogin != true {
+			return
+		}
+		//-- Defer log out of Hornbill instance until after main() is complete
+		defer logout()
 	}
-	//-- Defer log out of Hornbill instance until after main() is complete
-	defer logout()
 
 	//-- Build DB connection strings for sw_systemdb and swdata
 	connStrSysDB = buildConnectionString("cache")
@@ -134,6 +136,9 @@ func main() {
 	//-- End output
 	logger(1, "Requests Logged: "+fmt.Sprintf("%d", counters.created), true)
 	logger(1, "Requests Skipped: "+fmt.Sprintf("%d", counters.createdSkipped), true)
+	if counters.existingRequests > 0 {
+		logger(1, "Existing Requests Processed: "+fmt.Sprintf("%d", counters.existingRequests), true)
+	}
 	logger(1, "Files Attached: "+fmt.Sprintf("%d", counters.filesAttached), true)
 	//-- Show Time Takens
 	endTime = time.Now().Sub(startTime)

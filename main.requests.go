@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/xml"
 	"fmt"
+	"os"
 	"strconv"
 	"strings"
 	"sync"
@@ -27,9 +28,8 @@ func processCallData() {
 			wg.Add(1)
 			espXmlmc, err := NewEspXmlmcSession()
 			if err != nil {
-				logger(4, "Could not connect to Hornbill Instance: "+fmt.Sprintf("%v", err), false)
-				return
-
+				logger(4, "Could not connect to Hornbill Instance: "+err.Error(), true)
+				os.Exit(1)
 			}
 			go logNewCall(jobs, &wg, espXmlmc)
 		}
@@ -48,7 +48,6 @@ func processCallData() {
 			} else {
 				callID = fmt.Sprintf("%s", callRecordCallref)
 			}
-
 			jobs <- RequestDetails{CallClass: mapGenericConf.CallClass, CallMap: callRecordArr, SwCallID: callID}
 		}
 
@@ -73,7 +72,19 @@ func logNewCall(jobs chan RequestDetails, wg *sync.WaitGroup, espXmlmc *apiLib.X
 		swCallID := requestRecord.SwCallID
 		buffer.WriteString(loggerGen(3, "   "))
 		buffer.WriteString(loggerGen(1, "Buffer For Supportworks Ref: "+swCallID))
-		//boolCallLoggedOK := false
+
+		if smMappedRef, ok := swImportConf.ExistingRequestMappings[swCallID]; ok {
+			request := RequestReferences{SwCallID: swCallID, SmCallID: smMappedRef}
+			applyHistoricalUpdates(request, espXmlmc, &buffer)
+			mutexArrCallsLogged.Lock()
+			arrCallsLogged[swCallID] = smMappedRef
+			mutexArrCallsLogged.Unlock()
+			mutexCounters.Lock()
+			counters.existingRequests++
+			mutexCounters.Unlock()
+			continue
+		}
+
 		strNewCallRef := ""
 		strStatus := ""
 		boolOnHoldRequest := false
@@ -575,9 +586,6 @@ func logNewCall(jobs chan RequestDetails, wg *sync.WaitGroup, espXmlmc *apiLib.X
 				//Now apply historic updates
 				request := RequestReferences{SwCallID: swCallID, SmCallID: strNewCallRef}
 				applyHistoricalUpdates(request, espXmlmc, &buffer)
-
-				//Now process File Attachments
-				//processFileAttachments(swCallID, strNewCallRef, espXmlmc, &buffer)
 			}
 		} else {
 			//-- DEBUG XML TO LOG FILE

@@ -1,5 +1,12 @@
 # CHANGELOG
 
+## 1.10.0 (January 13th, 2019)
+
+Changes:
+
+- Can now define a custom query to retrive historic update records;
+- Improved nil value handling when writing historic update records;
+
 ## 1.9.0 (December 19th, 2019)
 
 Changes:

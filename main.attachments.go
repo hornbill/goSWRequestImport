@@ -55,7 +55,11 @@ func processFileAttachments(swCallRef, smCallRef string, espXmlmc *apiLib.XmlmcI
 
 		fileRecord.Extension = filepath.Ext(fileRecord.FileName)
 		if fileRecord.Extension == ".swm" {
-			fileRecord.FileName = fileRecord.FileName + ".txt"
+			if len(fileRecord.FileName) > 251 {
+				fileRecord.FileName = fileRecord.FileName[0:251] + ".txt"
+			} else {
+				fileRecord.FileName = fileRecord.FileName + ".txt"
+			}
 			//Further processing for SWM files
 			//Copy content in to TXT file, and attach this instead
 			swmDecoded, boolDecoded := decodeSWMFile(fileRecord, espXmlmc)

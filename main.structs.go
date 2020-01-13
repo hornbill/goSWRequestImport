@@ -9,7 +9,7 @@ import (
 )
 
 const (
-	version           = "1.9.0"
+	version           = "1.10.0"
 	appServiceManager = "com.hornbill.servicemanager"
 )
 
@@ -71,9 +71,10 @@ var (
 // ----- Structures -----
 type counterTypeStruct struct {
 	sync.Mutex
-	created        int
-	createdSkipped int
-	filesAttached  int
+	created          int
+	createdSkipped   int
+	existingRequests int
+	filesAttached    int
 }
 
 //----- Config Data Structs
@@ -84,6 +85,7 @@ type swImportConfStruct struct {
 	CustomerType              string
 	SMProfileCodeSeperator    string
 	RelatedRequestQuery       string
+	CallDiaryQuery            string
 	SWSystemDBConf            sysDBConfStruct //Cache Data (sw_systemdb) connection details
 	SWAppDBConf               appDBConfStruct //App Data (swdata) connection details
 	RequestTypesToImport      []swCallConfStruct
@@ -93,9 +95,11 @@ type swImportConfStruct struct {
 	ResolutionCategoryMapping map[string]interface{}
 	ServiceMapping            map[string]interface{}
 	StatusMapping             map[string]interface{}
+	ExistingRequestMappings   map[string]string
 }
 type hbConfStruct struct {
 	InstanceID string
+	APIKey     string
 	UserName   string
 	Password   string
 }

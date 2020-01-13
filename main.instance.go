@@ -124,7 +124,11 @@ func doesContactExist(contactID string, espXmlmc *apiLib.XmlmcInstStruct, buffer
 //NewEspXmlmcSession - New Xmlmc Session variable (Cloned Session)
 func NewEspXmlmcSession() (*apiLib.XmlmcInstStruct, error) {
 	espXmlmcLocal := apiLib.NewXmlmcInstance(swImportConf.HBConf.InstanceID)
-	espXmlmcLocal.SetSessionID(espXmlmc.GetSessionID())
+	if swImportConf.HBConf.APIKey != "" {
+		espXmlmcLocal.SetAPIKey(swImportConf.HBConf.APIKey)
+	} else {
+		espXmlmcLocal.SetSessionID(espXmlmc.GetSessionID())
+	}
 	return espXmlmcLocal, nil
 }
 
