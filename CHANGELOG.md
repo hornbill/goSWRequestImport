@@ -1,13 +1,13 @@
 # CHANGELOG
 
-## 1.10.0 (January 13th, 2019)
+## 1.10.0 (January 13th, 2020)
 
 Changes:
 
 - Can now define a custom query to retrive historic update records;
 - Improved nil value handling when writing historic update records;
 
-## 1.9.0 (December 19th, 2019)
+## 1.9.0 (December 19th, 2019)
 
 Changes:
 
@@ -15,13 +15,13 @@ Changes:
 - Fixed intermittent issue with the updating of the log date
 - Fixed intermittent issue with the updating of calls to an on-hold status
 
-## 1.8.1 (November 21st, 2019)
+## 1.8.1 (November 21st, 2019)
 
 Defect Fix:
 
 - Issue resolving sites from mapped site name
 
-## 1.8.0 (November 19th, 2019)
+## 1.8.0 (November 19th, 2019)
 
 Changes:
 
@@ -40,7 +40,7 @@ Defect fix:
 
 - Customer association messages were reported as warnings instead of debugs in the log
 
-## 1.7.0 (November 14th, 2019)
+## 1.7.0 (November 14th, 2019)
 
 Feature:
 
