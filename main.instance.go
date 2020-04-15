@@ -76,6 +76,7 @@ func doesContactExist(contactID string, espXmlmc *apiLib.XmlmcInstStruct, buffer
 			return true
 		}
 		//Get Analyst Info
+		espXmlmc.SetParam("application", "com.hornbill.core")
 		espXmlmc.SetParam("entity", "Contact")
 		espXmlmc.SetParam("matchScope", "all")
 		espXmlmc.OpenElement("searchFilter")
