@@ -143,7 +143,7 @@ func logNewCall(jobs chan RequestDetails, wg *sync.WaitGroup, espXmlmc *apiLib.X
 					boolAnalystExists := doesUserExist(strOwnerID, espXmlmc, &buffer)
 					if boolAnalystExists {
 						//Get analyst from cache as exists
-						analystIsInCache, strOwnerName := recordInCache(strOwnerID, "User")
+						analystIsInCache, strOwnerName, _ := userInCache(strOwnerID)
 						if analystIsInCache && strOwnerName != "" {
 							coreFields[strAttribute] = strOwnerID
 							coreFields["h_ownername"] = strOwnerName

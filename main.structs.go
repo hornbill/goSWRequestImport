@@ -9,7 +9,7 @@ import (
 )
 
 const (
-	version           = "1.10.1"
+	version           = "1.10.2"
 	appServiceManager = "com.hornbill.servicemanager"
 )
 

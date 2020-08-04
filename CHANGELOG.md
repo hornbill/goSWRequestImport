@@ -1,5 +1,11 @@
 # CHANGELOG
 
+## 1.10.2 (August 4th, 2020)
+
+Fix:
+
+- Fixed issue with owner mapping
+
 ## 1.10.1 (April 15th, 2020)
 
 Change:
