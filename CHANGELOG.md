@@ -1,5 +1,13 @@
 # CHANGELOG
 
+## 1.11.0 (August 25th, 2020)
+
+Changes:
+
+- Set h_archived column to 1 when requests are being imported in a cancelled state
+- Changed BPM spawning to use processSpawn2 instead of processSpawn
+- Added version checking code
+
 ## 1.10.2 (August 4th, 2020)
 
 Fix:

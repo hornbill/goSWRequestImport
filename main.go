@@ -6,7 +6,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/hornbill/color"
+	"github.com/tcnksm/go-latest" //-- For Version checking
+
+	"github.com/fatih/color"
 	_ "github.com/hornbill/go-mssqldb" //Microsoft SQL Server driver - v2005+
 	_ "github.com/hornbill/mysql"      //MySQL v4.1 to v5.x and MariaDB driver
 	_ "github.com/hornbill/mysql320"   //MySQL v3.2.0 to v5 driver - Provides SWSQL (MySQL 4.0.16) support - originally weave-lab
@@ -29,6 +31,7 @@ func main() {
 	}
 	//-- Output to CLI and Log
 	logger(1, "---- Supportworks Call Import Utility V"+fmt.Sprintf("%v", version)+" ----", true)
+	checkVersion()
 	logger(1, "Flag - Config File "+configFileName, true)
 	logger(1, "Flag - Dry Run "+fmt.Sprintf("%v", configDryRun), true)
 	logger(1, "Flag - Concurrent Requests "+fmt.Sprintf("%v", configMaxRoutines), true)
@@ -145,4 +148,21 @@ func main() {
 	logger(1, "Time Taken: "+fmt.Sprintf("%v", endTime), true)
 	logger(1, "---- Supportworks Call Import Complete ---- ", true)
 
+}
+
+//-- Check Latest
+func checkVersion() {
+	githubTag := &latest.GithubTag{
+		Owner:      "hornbill",
+		Repository: repo,
+	}
+
+	res, err := latest.Check(githubTag, version)
+	if err != nil {
+		logger(4, "Unable to check utility version against Github repository: "+err.Error(), true)
+		return
+	}
+	if res.Outdated {
+		logger(5, version+" is not latest, you should upgrade to "+res.Current+" by downloading the latest package Here https://github.com/hornbill/"+repo+"/releases/tag/v"+res.Current, true)
+	}
 }

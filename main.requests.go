@@ -323,6 +323,9 @@ func logNewCall(jobs chan RequestDetails, wg *sync.WaitGroup, espXmlmc *apiLib.X
 					strStatus = "status.open"
 					boolOnHoldRequest = true
 				}
+				if strStatus == "status.cancelled" {
+					coreFields["h_archived"] = "1"
+				}
 				coreFields[strAttribute] = strStatus
 				boolAutoProcess = false
 			}
@@ -509,16 +512,17 @@ func logNewCall(jobs chan RequestDetails, wg *sync.WaitGroup, espXmlmc *apiLib.X
 					if strNewCallRef != "" && strServiceBPM != "" {
 						espXmlmc.SetParam("application", appServiceManager)
 						espXmlmc.SetParam("name", strServiceBPM)
-						espXmlmc.OpenElement("inputParams")
-						espXmlmc.SetParam("objectRefUrn", "urn:sys:entity:"+appServiceManager+":Requests:"+strNewCallRef)
-						espXmlmc.SetParam("requestId", strNewCallRef)
-						espXmlmc.CloseElement("inputParams")
-						if configDebug {
-							buffer.WriteString(loggerGen(1, "bpm::processSpawn:"+espXmlmc.GetParam()))
-						}
-						XMLBPM, xmlmcErr := espXmlmc.Invoke("bpm", "processSpawn")
+						espXmlmc.SetParam("reference", strNewCallRef)
+						espXmlmc.OpenElement("inputParam")
+						espXmlmc.SetParam("name", "objectRefUrn")
+						espXmlmc.SetParam("value", "urn:sys:entity:"+appServiceManager+":Requests:"+strNewCallRef)
+						espXmlmc.CloseElement("inputParam")
+						espXmlmc.OpenElement("inputParam")
+						espXmlmc.SetParam("name", "requestId")
+						espXmlmc.SetParam("value", strNewCallRef)
+						espXmlmc.CloseElement("inputParam")
+						XMLBPM, xmlmcErr := espXmlmc.Invoke("bpm", "processSpawn2")
 						if xmlmcErr != nil {
-							//log.Fatal(xmlmcErr)
 							buffer.WriteString(loggerGen(4, "Unable to invoke BPM for request ["+strNewCallRef+"]: "+fmt.Sprintf("%v", xmlmcErr)))
 						}
 						var xmlRespon xmlmcBPMSpawnedStruct
