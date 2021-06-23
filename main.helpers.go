@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"log"
 	"os"
-	"regexp"
 	"strconv"
 	"strings"
 	"time"
@@ -30,7 +29,7 @@ func loadConfig() (swImportConfStruct, bool) {
 	file, fileError := os.Open(configurationFilePath)
 	//-- Check For Error Reading File
 	if fileError != nil {
-		logger(4, "Error Opening Configuration File: "+fmt.Sprintf("%v", fileError), true)
+		logger(4, "Error Opening Configuration File: "+fileError.Error(), true)
 		boolLoadConf = false
 	}
 
@@ -42,7 +41,7 @@ func loadConfig() (swImportConfStruct, bool) {
 	err := decoder.Decode(&edbConf)
 	//-- Error Checking
 	if err != nil {
-		logger(4, "Error Decoding Configuration File: "+fmt.Sprintf("%v", err), true)
+		logger(4, "Error Decoding Configuration File: "+err.Error(), true)
 		boolLoadConf = false
 	}
 	//-- Return New Config
@@ -157,7 +156,7 @@ func epochToDateTime(epochDateString string) string {
 	dateTime := ""
 	i, err := strconv.ParseInt(epochDateString, 10, 64)
 	if err != nil {
-		logger(5, "EPOCH String to Int conversion FAILED: "+fmt.Sprintf("%v", err), false)
+		logger(5, "EPOCH String to Int conversion FAILED: "+err.Error(), false)
 	} else {
 		dateTimeStr := time.Unix(i, 0).UTC().String() //Force UTC
 		for i := 0; i < 19; i++ {
@@ -187,22 +186,6 @@ func convExtendedColName(oldColName string) string {
 	arrColName := strings.Split(oldColName, "_")
 	strNewColID := strconv.Itoa(int([]rune(arrColName[2])[0]) - 96)
 	return "h_custom_" + strNewColID
-}
-
-func getSupportworksIntRef(swCallRef string) int {
-	var returnRef int
-	re := regexp.MustCompile("[0-9]{1,}")
-	intRef := re.FindAllString(swCallRef, 1)
-	if intRef != nil {
-		intRefSlice := strings.TrimLeft(intRef[0], "0")
-		intRefInt, err := strconv.ParseInt(intRefSlice, 10, 0)
-		if err != nil {
-			logger(4, "Could not convert Supportworks reference number: "+fmt.Sprintf("%v", err), false)
-		} else {
-			returnRef = int(intRefInt)
-		}
-	}
-	return returnRef
 }
 
 //parseFlags - grabs and parses command line flags

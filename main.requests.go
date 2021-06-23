@@ -17,7 +17,7 @@ import (
 
 //processCallData - Query Supportworks call data, process accordingly
 func processCallData() {
-	if queryDBCallDetails(mapGenericConf.CallClass, mapGenericConf.SupportworksCallClass, connStrAppDB) == true {
+	if queryDBCallDetails(mapGenericConf.CallClass, mapGenericConf.SupportworksCallClass, connStrAppDB) {
 		bar := pb.StartNew(len(arrCallDetailsMaps))
 
 		var wg sync.WaitGroup
@@ -206,7 +206,7 @@ func logNewCall(jobs chan RequestDetails, wg *sync.WaitGroup, espXmlmc *apiLib.X
 				strPriorityID := getFieldValue(strMapping, callMap)
 				strPriorityMapped, strPriorityName := getCallPriorityID(strPriorityID, espXmlmc, &buffer)
 				if strPriorityMapped == "" && mapGenericConf.DefaultPriority != "" {
-					strPriorityID = getPriorityID(mapGenericConf.DefaultPriority, espXmlmc, &buffer)
+					strPriorityMapped = getPriorityID(mapGenericConf.DefaultPriority, espXmlmc, &buffer)
 					strPriorityName = mapGenericConf.DefaultPriority
 				}
 				coreFields[strAttribute] = strPriorityMapped
@@ -261,6 +261,8 @@ func logNewCall(jobs chan RequestDetails, wg *sync.WaitGroup, espXmlmc *apiLib.X
 								strServiceBPM = service.ServiceBPMProblem
 							case "Known Error":
 								strServiceBPM = service.ServiceBPMKnownError
+							case "Release":
+								strServiceBPM = service.ServiceBPMRelease
 							}
 						}
 					}
@@ -414,7 +416,7 @@ func logNewCall(jobs chan RequestDetails, wg *sync.WaitGroup, espXmlmc *apiLib.X
 		espXmlmc.CloseElement("relatedEntityData")
 
 		//-- Check for Dry Run
-		if configDryRun != true {
+		if !configDryRun {
 			//XMLRequest := espXmlmc.GetParam()
 			if configDebug {
 				buffer.WriteString(loggerGen(1, "entityAddRecord::Requests:"+espXmlmc.GetParam()))
@@ -438,7 +440,6 @@ func logNewCall(jobs chan RequestDetails, wg *sync.WaitGroup, espXmlmc *apiLib.X
 				mutexCounters.Lock()
 				counters.createdSkipped++
 				mutexCounters.Unlock()
-				strNewCallRef = xmlRespon.State.ErrorRet
 				buffer.WriteString(loggerGen(4, "Log Request Failed ["+xmlRespon.State.ErrorRet+"]"))
 			} else {
 				strNewCallRef = xmlRespon.RequestID
@@ -491,13 +492,13 @@ func logNewCall(jobs chan RequestDetails, wg *sync.WaitGroup, espXmlmc *apiLib.X
 					}
 					XMLLogDate, xmlmcErr := espXmlmc.Invoke("data", "entityUpdateRecord")
 					if xmlmcErr != nil {
-						buffer.WriteString(loggerGen(4, "Unable to update Log Date of request ["+strNewCallRef+"] : "+fmt.Sprintf("%v", xmlmcErr)))
+						buffer.WriteString(loggerGen(4, "Unable to update Log Date of request ["+strNewCallRef+"] : "+xmlmcErr.Error()))
 					}
 					var xmlRespon xmlmcResponse
 
 					errLogDate := xml.Unmarshal([]byte(XMLLogDate), &xmlRespon)
 					if errLogDate != nil {
-						buffer.WriteString(loggerGen(4, "Unable to update Log Date of request ["+strNewCallRef+"] : "+fmt.Sprintf("%v", errLogDate)))
+						buffer.WriteString(loggerGen(4, "Unable to update Log Date of request ["+strNewCallRef+"] : "+errLogDate.Error()))
 					}
 					if xmlRespon.MethodResult != "ok" {
 						buffer.WriteString(loggerGen(4, "Unable to update Log Date of request ["+strNewCallRef+"] : "+xmlRespon.State.ErrorRet))
@@ -523,13 +524,13 @@ func logNewCall(jobs chan RequestDetails, wg *sync.WaitGroup, espXmlmc *apiLib.X
 						espXmlmc.CloseElement("inputParam")
 						XMLBPM, xmlmcErr := espXmlmc.Invoke("bpm", "processSpawn2")
 						if xmlmcErr != nil {
-							buffer.WriteString(loggerGen(4, "Unable to invoke BPM for request ["+strNewCallRef+"]: "+fmt.Sprintf("%v", xmlmcErr)))
+							buffer.WriteString(loggerGen(4, "Unable to invoke BPM for request ["+strNewCallRef+"]: "+xmlmcErr.Error()))
 						}
 						var xmlRespon xmlmcBPMSpawnedStruct
 
 						errBPM := xml.Unmarshal([]byte(XMLBPM), &xmlRespon)
 						if errBPM != nil {
-							buffer.WriteString(loggerGen(4, "Unable to read response when invoking BPM for request ["+strNewCallRef+"]:"+fmt.Sprintf("%v", errBPM)))
+							buffer.WriteString(loggerGen(4, "Unable to read response when invoking BPM for request ["+strNewCallRef+"]:"+errBPM.Error()))
 						}
 						if xmlRespon.MethodResult != "ok" {
 							buffer.WriteString(loggerGen(4, "Unable to invoke BPM for request ["+strNewCallRef+"]: "+xmlRespon.State.ErrorRet))
@@ -548,13 +549,13 @@ func logNewCall(jobs chan RequestDetails, wg *sync.WaitGroup, espXmlmc *apiLib.X
 							}
 							XMLBPMUpdate, xmlmcErr := espXmlmc.Invoke("data", "entityUpdateRecord")
 							if xmlmcErr != nil {
-								buffer.WriteString(loggerGen(4, "Unable to associated spawned BPM to request ["+strNewCallRef+"]: "+fmt.Sprintf("%v", xmlmcErr)))
+								buffer.WriteString(loggerGen(4, "Unable to associated spawned BPM to request ["+strNewCallRef+"]: "+xmlmcErr.Error()))
 							}
 							var xmlRespon xmlmcResponse
 
 							errBPMSpawn := xml.Unmarshal([]byte(XMLBPMUpdate), &xmlRespon)
 							if errBPMSpawn != nil {
-								buffer.WriteString(loggerGen(4, "Unable to read response from Hornbill instance when updating BPM on ["+strNewCallRef+"]:"+fmt.Sprintf("%v", errBPMSpawn)))
+								buffer.WriteString(loggerGen(4, "Unable to read response from Hornbill instance when updating BPM on ["+strNewCallRef+"]:"+errBPMSpawn.Error()))
 							}
 							if xmlRespon.MethodResult != "ok" {
 								buffer.WriteString(loggerGen(4, "Unable to associate BPM to Request ["+strNewCallRef+"]: "+xmlRespon.State.ErrorRet))
@@ -574,13 +575,13 @@ func logNewCall(jobs chan RequestDetails, wg *sync.WaitGroup, espXmlmc *apiLib.X
 					XMLBPM, xmlmcErr := espXmlmc.Invoke("apps/"+appServiceManager+"/Requests", "holdRequest")
 					if xmlmcErr != nil {
 						//log.Fatal(xmlmcErr)
-						buffer.WriteString(loggerGen(4, "Unable to place request on hold ["+strNewCallRef+"] : "+fmt.Sprintf("%v", xmlmcErr)))
+						buffer.WriteString(loggerGen(4, "Unable to place request on hold ["+strNewCallRef+"] : "+xmlmcErr.Error()))
 					}
 					var xmlRespon xmlmcResponse
 
 					errLogDate := xml.Unmarshal([]byte(XMLBPM), &xmlRespon)
 					if errLogDate != nil {
-						buffer.WriteString(loggerGen(4, "Unable to place request on hold ["+strNewCallRef+"] : "+fmt.Sprintf("%v", errLogDate)))
+						buffer.WriteString(loggerGen(4, "Unable to place request on hold ["+strNewCallRef+"] : "+errLogDate.Error()))
 					}
 					if xmlRespon.MethodResult != "ok" {
 						buffer.WriteString(loggerGen(4, "Unable to place request on hold ["+strNewCallRef+"] : "+xmlRespon.State.ErrorRet))

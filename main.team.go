@@ -63,7 +63,7 @@ func searchTeam(teamName string, espXmlmc *apiLib.XmlmcInstStruct, buffer *bytes
 
 	XMLTeamSearch, xmlmcErr := espXmlmc.Invoke("data", "entityBrowseRecords2")
 	if xmlmcErr != nil {
-		buffer.WriteString(loggerGen(4, "Unable to Search for Team: "+fmt.Sprintf("%v", xmlmcErr)))
+		buffer.WriteString(loggerGen(4, "Unable to Search for Team: "+xmlmcErr.Error()))
 		//log.Fatal(xmlmcErr)
 		return boolReturn, strReturn
 	}
@@ -71,14 +71,14 @@ func searchTeam(teamName string, espXmlmc *apiLib.XmlmcInstStruct, buffer *bytes
 
 	err := xml.Unmarshal([]byte(XMLTeamSearch), &xmlRespon)
 	if err != nil {
-		buffer.WriteString(loggerGen(4, "Unable to Search for Team: "+fmt.Sprintf("%v", err)))
+		buffer.WriteString(loggerGen(4, "Unable to Search for Team: "+err.Error()))
 	} else {
 		if xmlRespon.MethodResult != "ok" {
 			buffer.WriteString(loggerGen(5, "Unable to Search for Team: "+xmlRespon.State.ErrorRet))
 		} else {
 			//-- Check Response
 			if xmlRespon.Name != "" {
-				if strings.ToLower(xmlRespon.Name) == strings.ToLower(teamName) {
+				if strings.EqualFold(xmlRespon.Name, teamName) {
 					strReturn = xmlRespon.ID
 					boolReturn = true
 					//-- Add Team to Cache

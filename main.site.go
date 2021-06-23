@@ -46,7 +46,7 @@ func searchSite(siteName string, espXmlmc *apiLib.XmlmcInstStruct, buffer *bytes
 
 	XMLSiteSearch, xmlmcErr := espXmlmc.Invoke("data", "entityBrowseRecords")
 	if xmlmcErr != nil {
-		buffer.WriteString(loggerGen(4, "Unable to Search for Site: "+fmt.Sprintf("%v", xmlmcErr)))
+		buffer.WriteString(loggerGen(4, "Unable to Search for Site: "+xmlmcErr.Error()))
 		return boolReturn, intReturn
 		//log.Fatal(xmlmcErr)
 	}
@@ -54,14 +54,14 @@ func searchSite(siteName string, espXmlmc *apiLib.XmlmcInstStruct, buffer *bytes
 
 	err := xml.Unmarshal([]byte(XMLSiteSearch), &xmlRespon)
 	if err != nil {
-		buffer.WriteString(loggerGen(4, "Unable to Search for Site: "+fmt.Sprintf("%v", err)))
+		buffer.WriteString(loggerGen(4, "Unable to Search for Site: "+xmlmcErr.Error()))
 	} else {
 		if xmlRespon.MethodResult != "ok" {
 			buffer.WriteString(loggerGen(5, "Unable to Search for Site: "+xmlRespon.State.ErrorRet))
 		} else {
 			//-- Check Response
 			if xmlRespon.SiteName != "" {
-				if strings.ToLower(xmlRespon.SiteName) == strings.ToLower(siteName) {
+				if strings.EqualFold(xmlRespon.SiteName, siteName) {
 					intReturn = xmlRespon.SiteID
 					boolReturn = true
 					//-- Add Site to Cache

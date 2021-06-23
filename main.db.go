@@ -25,7 +25,7 @@ func buildConnectionString(strDataSource string) string {
 			connectString = connectString + ";database=" + swImportConf.SWAppDBConf.Database
 			connectString = connectString + ";user id=" + swImportConf.SWAppDBConf.UserName
 			connectString = connectString + ";password=" + swImportConf.SWAppDBConf.Password
-			if swImportConf.SWAppDBConf.Encrypt == false {
+			if !swImportConf.SWAppDBConf.Encrypt {
 				connectString = connectString + ";encrypt=disable"
 			}
 			if swImportConf.SWAppDBConf.Port != 0 {
@@ -74,14 +74,14 @@ func queryDBCallDetails(callClass, swCallClass, connString string) bool {
 	//Connect to the JSON specified DB
 	db2, err := sqlx.Open(appDBDriver, connString)
 	if err != nil {
-		logger(4, "[DATABASE] Database Connection Error: "+fmt.Sprintf("%v", err), true)
+		logger(4, "[DATABASE] Database Connection Error: "+err.Error(), true)
 		return false
 	}
 	defer db2.Close()
 	//Check connection is open
 	err = db2.Ping()
 	if err != nil {
-		logger(4, "[DATABASE] [PING] Database Connection Error: "+fmt.Sprintf("%v", err), true)
+		logger(4, "[DATABASE] [PING] Database Connection Error: "+err.Error(), true)
 		return false
 	}
 	logger(3, "[DATABASE] Connection Successful", true)
@@ -94,7 +94,7 @@ func queryDBCallDetails(callClass, swCallClass, connString string) bool {
 	//Run Query
 	rows, err := db2.Queryx(sqlCallQuery)
 	if err != nil {
-		logger(4, " Database Query Error: "+fmt.Sprintf("%v", err), true)
+		logger(4, " Database Query Error: "+err.Error(), true)
 		return false
 	}
 	defer rows.Close()

@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/hornbill/goApiLib"
+	apiLib "github.com/hornbill/goApiLib"
 )
 
 //getCallCategoryID takes the Call Record and returns a correct Category ID if one exists on the Instance
@@ -78,14 +78,14 @@ func searchCategory(categoryCode, categoryGroup string, espXmlmc *apiLib.XmlmcIn
 	espXmlmc.SetParam("code", categoryCode)
 	XMLCategorySearch, xmlmcErr := espXmlmc.Invoke("data", "profileCodeLookup")
 	if xmlmcErr != nil {
-		buffer.WriteString(loggerGen(4, "XMLMC API Invoke Failed for "+categoryGroup+" Category ["+categoryCode+"]: "+fmt.Sprintf("%v", xmlmcErr)))
+		buffer.WriteString(loggerGen(4, "XMLMC API Invoke Failed for "+categoryGroup+" Category ["+categoryCode+"]: "+xmlmcErr.Error()))
 		return boolReturn, idReturn, strReturn
 	}
 	var xmlRespon xmlmcCategoryListResponse
 
 	err := xml.Unmarshal([]byte(XMLCategorySearch), &xmlRespon)
 	if err != nil {
-		buffer.WriteString(loggerGen(4, "Unable to unmarshal response for "+categoryGroup+" Category: "+fmt.Sprintf("%v", err)))
+		buffer.WriteString(loggerGen(4, "Unable to unmarshal response for "+categoryGroup+" Category: "+err.Error()))
 	} else {
 		if xmlRespon.MethodResult != "ok" {
 			buffer.WriteString(loggerGen(5, "Unable to Search for "+categoryGroup+" Category ["+categoryCode+"]: ["+fmt.Sprintf("%v", xmlRespon.MethodResult)+"] "+xmlRespon.State.ErrorRet))

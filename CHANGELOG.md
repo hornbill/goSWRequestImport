@@ -1,5 +1,12 @@
 # CHANGELOG
 
+## 1.12.0 (June 23rd, 2021)
+
+Changes:
+
+- Removed references to content location for file attachments, as this is no longer required
+- Added support for Release Request workflows to be spawned 
+
 ## 1.11.0 (August 25th, 2020)
 
 Changes:

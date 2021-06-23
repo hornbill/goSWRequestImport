@@ -3,7 +3,6 @@ package main
 import (
 	"bytes"
 	"encoding/xml"
-	"fmt"
 
 	apiLib "github.com/hornbill/goApiLib"
 )
@@ -26,14 +25,14 @@ func searchGroup(groupID string, espXmlmc *apiLib.XmlmcInstStruct, buffer *bytes
 	espXmlmc.SetParam("id", groupID)
 	XMLTeamSearch, xmlmcErr := espXmlmc.Invoke("admin", "groupGetInfo")
 	if xmlmcErr != nil {
-		buffer.WriteString(loggerGen(4, "Unable to Search for Group: "+fmt.Sprintf("%v", xmlmcErr)))
+		buffer.WriteString(loggerGen(4, "Unable to Search for Group: "+xmlmcErr.Error()))
 		return groupFound, groupName
 	}
 	var xmlRespon xmlmcGroupListResponse
 
 	err := xml.Unmarshal([]byte(XMLTeamSearch), &xmlRespon)
 	if err != nil {
-		buffer.WriteString(loggerGen(4, "Unable to Search for Group: "+fmt.Sprintf("%v", err)))
+		buffer.WriteString(loggerGen(4, "Unable to Search for Group: "+err.Error()))
 	} else {
 		if xmlRespon.MethodResult != "ok" {
 			buffer.WriteString(loggerGen(5, "Unable to Search for Group: "+xmlRespon.State.ErrorRet))

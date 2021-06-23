@@ -53,7 +53,7 @@ func main() {
 
 	//-- Load Configuration File Into Struct
 	swImportConf, boolConfLoaded = loadConfig()
-	if boolConfLoaded != true {
+	if !boolConfLoaded {
 		logger(4, "Unable to load config, process closing.", true)
 		return
 	}
@@ -88,7 +88,7 @@ func main() {
 	if swImportConf.HBConf.APIKey == "" {
 		//-- Log in to Hornbill instance
 		var boolLogin = login()
-		if boolLogin != true {
+		if !boolLogin {
 			return
 		}
 		//-- Defer log out of Hornbill instance until after main() is complete
@@ -122,7 +122,7 @@ func main() {
 
 	//Get request type import config, process each in turn
 	for _, val := range swImportConf.RequestTypesToImport {
-		if val.Import == true {
+		if val.Import {
 			reqPrefix = getRequestPrefix(val.CallClass)
 			mapGenericConf = val
 			processCallData()
@@ -144,7 +144,7 @@ func main() {
 	}
 	logger(1, "Files Attached: "+fmt.Sprintf("%d", counters.filesAttached), true)
 	//-- Show Time Takens
-	endTime = time.Now().Sub(startTime)
+	endTime = time.Since(startTime)
 	logger(1, "Time Taken: "+fmt.Sprintf("%v", endTime), true)
 	logger(1, "---- Supportworks Call Import Complete ---- ", true)
 

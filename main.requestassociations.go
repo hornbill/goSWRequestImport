@@ -2,7 +2,6 @@ package main
 
 import (
 	"encoding/xml"
-	"fmt"
 )
 
 //processCallAssociations - Get all records from swdata.cmn_rel_opencall_oc, process accordingly
@@ -11,7 +10,7 @@ func processCallAssociations() {
 	//Check connection is open
 	err := dbapp.Ping()
 	if err != nil {
-		logger(4, " [DATABASE] [PING] Database Connection Error for Request Associations: "+fmt.Sprintf("%v", err), false)
+		logger(4, " [DATABASE] [PING] Database Connection Error for Request Associations: "+err.Error(), false)
 		return
 	}
 	logger(3, "[DATABASE] Connection Successful", false)
@@ -23,7 +22,7 @@ func processCallAssociations() {
 	//Run Query
 	rows, err := dbapp.Queryx(sqlDiaryQuery)
 	if err != nil {
-		logger(4, " Database Query Error: "+fmt.Sprintf("%v", err), false)
+		logger(4, " Database Query Error: "+err.Error(), false)
 		return
 	}
 
@@ -32,13 +31,13 @@ func processCallAssociations() {
 
 		errDataMap := rows.StructScan(&requestRels)
 		if errDataMap != nil {
-			logger(4, " Data Mapping Error: "+fmt.Sprintf("%v", errDataMap), false)
+			logger(4, " Data Mapping Error: "+errDataMap.Error(), false)
 			return
 		}
 		smMasterRef, mrOK := arrCallsLogged[requestRels.MasterRef]
 		smSlaveRef, srOK := arrCallsLogged[requestRels.SlaveRef]
 
-		if mrOK == true && smMasterRef != "" && srOK == true && smSlaveRef != "" {
+		if mrOK && smMasterRef != "" && srOK && smSlaveRef != "" {
 			//We have Master and Slave calls matched in the SM database
 			jobs := refStruct{MasterRef: smMasterRef, SlaveRef: smSlaveRef}
 			addAssocRecord(jobs)
@@ -67,13 +66,13 @@ func addAssocRecord(assoc refStruct) {
 	XMLUpdate, xmlmcErr := espXmlmc.Invoke("apps/com.hornbill.servicemanager/RelationshipEntities", "add")
 	if xmlmcErr != nil {
 		//		log.Fatal(xmlmcErr)
-		logger(4, "Unable to create Request Association between ["+assoc.MasterRef+"] and ["+assoc.SlaveRef+"] :"+fmt.Sprintf("%v", xmlmcErr), false)
+		logger(4, "Unable to create Request Association between ["+assoc.MasterRef+"] and ["+assoc.SlaveRef+"] :"+xmlmcErr.Error(), false)
 		return
 	}
 	var xmlRespon xmlmcResponse
 	errXMLMC := xml.Unmarshal([]byte(XMLUpdate), &xmlRespon)
 	if errXMLMC != nil {
-		logger(4, "Unable to read response from Hornbill instance for Request Association between ["+assoc.MasterRef+"] and ["+assoc.SlaveRef+"] :"+fmt.Sprintf("%v", errXMLMC), false)
+		logger(4, "Unable to read response from Hornbill instance for Request Association between ["+assoc.MasterRef+"] and ["+assoc.SlaveRef+"] :"+errXMLMC.Error(), false)
 		return
 	}
 	if xmlRespon.MethodResult != "ok" {

@@ -33,13 +33,13 @@ func doesUserExist(userID string, espXmlmc *apiLib.XmlmcInstStruct, buffer *byte
 
 			XMLAnalystSearch, xmlmcErr := espXmlmc.Invoke("admin", "userGetInfo")
 			if xmlmcErr != nil {
-				buffer.WriteString(loggerGen(4, "Unable to Search for User ["+userID+"]: "+fmt.Sprintf("%v", xmlmcErr)))
+				buffer.WriteString(loggerGen(4, "Unable to Search for User ["+userID+"]: "+xmlmcErr.Error()))
 			}
 
 			var xmlRespon xmlmcUserListResponse
 			err := xml.Unmarshal([]byte(XMLAnalystSearch), &xmlRespon)
 			if err != nil {
-				buffer.WriteString(loggerGen(4, "Unable to Search for User ["+userID+"]: "+fmt.Sprintf("%v", err)))
+				buffer.WriteString(loggerGen(4, "Unable to Search for User ["+userID+"]: "+err.Error()))
 			} else {
 				if xmlRespon.MethodResult != "ok" {
 					//Analyst most likely does not exist
@@ -87,13 +87,13 @@ func doesContactExist(contactID string, espXmlmc *apiLib.XmlmcInstStruct, buffer
 		espXmlmc.SetParam("maxResults", "1")
 		XMLCustomerSearch, xmlmcErr := espXmlmc.Invoke("data", "entityBrowseRecords2")
 		if xmlmcErr != nil {
-			buffer.WriteString(loggerGen(4, "Unable to Search for Contact ["+contactID+"]: "+fmt.Sprintf("%v", xmlmcErr)))
+			buffer.WriteString(loggerGen(4, "Unable to Search for Contact ["+contactID+"]: "+xmlmcErr.Error()))
 		}
 		var xmlRespon xmlmcContactListResponse
 
 		err := xml.Unmarshal([]byte(XMLCustomerSearch), &xmlRespon)
 		if err != nil {
-			buffer.WriteString(loggerGen(4, "Unable to Search for Contact ["+contactID+"]: "+fmt.Sprintf("%v", err)))
+			buffer.WriteString(loggerGen(4, "Unable to Search for Contact ["+contactID+"]: "+err.Error()))
 		} else {
 			if xmlRespon.MethodResult != "ok" {
 				//Customer most likely does not exist
@@ -143,14 +143,14 @@ func login() bool {
 	espXmlmc.SetParam("password", base64.StdEncoding.EncodeToString([]byte(swImportConf.HBConf.Password)))
 	XMLLogin, xmlmcErr := espXmlmc.Invoke("session", "userLogon")
 	if xmlmcErr != nil {
-		logger(4, "Unable to Login: "+fmt.Sprintf("%v", xmlmcErr), true)
+		logger(4, "Unable to Login: "+xmlmcErr.Error(), true)
 		return false
 	}
 
 	var xmlRespon xmlmcResponse
 	err := xml.Unmarshal([]byte(XMLLogin), &xmlRespon)
 	if err != nil {
-		logger(4, "Unable to Login: "+fmt.Sprintf("%v", err), true)
+		logger(4, "Unable to Login: "+err.Error(), true)
 		return false
 	}
 	if xmlRespon.MethodResult != "ok" {

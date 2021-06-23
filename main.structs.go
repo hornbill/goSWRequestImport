@@ -9,7 +9,7 @@ import (
 )
 
 const (
-	version           = "1.11.0"
+	version           = "1.12.0"
 	repo              = "goSWRequestImport"
 	appServiceManager = "com.hornbill.servicemanager"
 )
@@ -47,8 +47,6 @@ var (
 	timeNow                string
 	startTime              time.Time
 	endTime                time.Duration
-	xmlmcInstanceConfig    xmlmcConfigStruct
-	mutex                  = &sync.Mutex{}
 	mutexAnalysts          = &sync.Mutex{}
 	mutexArrCallsLogged    = &sync.Mutex{}
 	mutexBar               = &sync.Mutex{}
@@ -134,12 +132,6 @@ type swCallConfStruct struct {
 	AdditionalFieldMapping map[string]interface{}
 }
 
-//----- XMLMC Config and Interaction Structs
-type xmlmcConfigStruct struct {
-	instance string
-	url      string
-	zone     string
-}
 type xmlmcResponse struct {
 	MethodResult string      `xml:"status,attr"`
 	State        stateStruct `xml:"state"`
@@ -207,6 +199,7 @@ type serviceListStruct struct {
 	ServiceBPMChange     string
 	ServiceBPMProblem    string
 	ServiceBPMKnownError string
+	ServiceBPMRelease    string
 }
 type xmlmcServiceListResponse struct {
 	MethodResult  string      `xml:"status,attr"`
@@ -217,6 +210,7 @@ type xmlmcServiceListResponse struct {
 	BPMChange     string      `xml:"params>rowData>row>h_change_bpm_name"`
 	BPMProblem    string      `xml:"params>rowData>row>h_problem_bpm_name"`
 	BPMKnownError string      `xml:"params>rowData>row>h_knownerror_bpm_name"`
+	BPMRelease    string      `xml:"params>rowData>row>h_release_bpm_name"`
 	State         stateStruct `xml:"state"`
 }
 
@@ -363,12 +357,6 @@ type fileAssocStruct struct {
 	Extension       string
 	Description     string
 	EmailAttachment fileAttachStruct
-}
-
-type xmlmcIndexListResponse struct {
-	MethodResult string      `xml:"status,attr"`
-	State        stateStruct `xml:"state"`
-	Indexes      []string    `xml:"params>indexStorage"`
 }
 
 //RequestDetails struct for chan

@@ -144,13 +144,13 @@ func applyHistoricalUpdates(request RequestReferences, espXmlmc *apiLib.XmlmcIns
 			}
 			XMLUpdate, xmlmcErr := espXmlmc.Invoke("data", "entityAddRecord")
 			if xmlmcErr != nil {
-				buffer.WriteString(loggerGen(3, "API Invoke Failed Unable to add Historical Call Diary Update: "+fmt.Sprintf("%v", xmlmcErr)))
+				buffer.WriteString(loggerGen(3, "API Invoke Failed Unable to add Historical Call Diary Update: "+xmlmcErr.Error()))
 				errCount++
 			}
 			var xmlRespon xmlmcResponse
 			errXMLMC := xml.Unmarshal([]byte(XMLUpdate), &xmlRespon)
 			if errXMLMC != nil {
-				buffer.WriteString(loggerGen(4, "Unable to read response from Hornbill instance:"+fmt.Sprintf("%v", errXMLMC)))
+				buffer.WriteString(loggerGen(4, "Unable to read response from Hornbill instance: "+errXMLMC.Error()))
 				errCount++
 			}
 			if xmlRespon.MethodResult != "ok" {
@@ -162,5 +162,4 @@ func applyHistoricalUpdates(request RequestReferences, espXmlmc *apiLib.XmlmcIns
 		}
 	}
 	buffer.WriteString(loggerGen(1, strconv.Itoa(sucCount)+" of "+strconv.Itoa(sucCount+errCount)+" Historic Update records created"))
-	return
 }

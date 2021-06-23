@@ -7,7 +7,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/hornbill/goApiLib"
+	apiLib "github.com/hornbill/goApiLib"
 )
 
 //getCallPriorityID takes the Call Record and returns a correct Priority ID if one exists on the Instance
@@ -57,7 +57,7 @@ func searchPriority(priorityName string, espXmlmc *apiLib.XmlmcInstStruct, buffe
 
 	XMLPrioritySearch, xmlmcErr := espXmlmc.Invoke("data", "entityBrowseRecords")
 	if xmlmcErr != nil {
-		buffer.WriteString(loggerGen(4, "Unable to Search for Priority: "+fmt.Sprintf("%v", xmlmcErr)))
+		buffer.WriteString(loggerGen(4, "Unable to Search for Priority: "+xmlmcErr.Error()))
 		return boolReturn, intReturn
 		//log.Fatal(xmlmcErr)
 	}
@@ -65,14 +65,14 @@ func searchPriority(priorityName string, espXmlmc *apiLib.XmlmcInstStruct, buffe
 
 	err := xml.Unmarshal([]byte(XMLPrioritySearch), &xmlRespon)
 	if err != nil {
-		buffer.WriteString(loggerGen(4, "Unable to Search for Priority: "+fmt.Sprintf("%v", err)))
+		buffer.WriteString(loggerGen(4, "Unable to Search for Priority: "+err.Error()))
 	} else {
 		if xmlRespon.MethodResult != "ok" {
 			buffer.WriteString(loggerGen(5, "Unable to Search for Priority: "+xmlRespon.State.ErrorRet))
 		} else {
 			//-- Check Response
 			if xmlRespon.PriorityName != "" {
-				if strings.ToLower(xmlRespon.PriorityName) == strings.ToLower(priorityName) {
+				if strings.EqualFold(xmlRespon.PriorityName, priorityName) {
 					intReturn = xmlRespon.PriorityID
 					boolReturn = true
 					//-- Add Priority to Cache

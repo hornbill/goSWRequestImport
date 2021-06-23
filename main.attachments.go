@@ -20,7 +20,7 @@ func processAttachments() {
 	//Process attachments for all imported requests
 	espXmlmc, err := NewEspXmlmcSession()
 	if err != nil {
-		logger(4, "Could not connect to Hornbill Instance: "+fmt.Sprintf("%v", err), false)
+		logger(4, "Could not connect to Hornbill Instance: "+err.Error(), false)
 		return
 
 	}
@@ -106,7 +106,7 @@ func getFileEncoded(fileRecord fileAssocStruct) (string, error) {
 	file, fileError := os.Open(fullFilePath)
 	//-- Check For Error Reading File
 	if fileError != nil {
-		logger(4, "Error Opening File: "+fmt.Sprintf("%v", fileError), false)
+		logger(4, "Error Opening File: "+fileError.Error(), false)
 		return "", fileError
 	}
 	defer file.Close()
@@ -130,7 +130,7 @@ func fileAttachmentData(swRequest, smRequest string) []fileAssocStruct {
 	//Check connection is open
 	err := dbsys.Ping()
 	if err != nil {
-		logger(4, "[DATABASE] [PING] Database Connection Error for Request File Attachments: "+fmt.Sprintf("%v", err), false)
+		logger(4, "[DATABASE] [PING] Database Connection Error for Request File Attachments: "+err.Error(), false)
 		return returnArray
 	}
 
@@ -141,7 +141,7 @@ func fileAttachmentData(swRequest, smRequest string) []fileAssocStruct {
 	//Run Query
 	rows, err := dbsys.Queryx(sqlFileQuery)
 	if err != nil {
-		logger(4, " Database Query Error: "+fmt.Sprintf("%v", err), false)
+		logger(4, " Database Query Error: "+err.Error(), false)
 		return returnArray
 	}
 	//-- Iterate through file attachment records returned from SQL query:
@@ -150,7 +150,7 @@ func fileAttachmentData(swRequest, smRequest string) []fileAssocStruct {
 		var requestAttachment fileAssocStruct
 		err = rows.StructScan(&requestAttachment)
 		if err != nil {
-			logger(4, " Data Mapping Error: "+fmt.Sprintf("%v", err), false)
+			logger(4, " Data Mapping Error: "+err.Error(), false)
 		}
 		//Add to array for reponse
 		returnArray = append(returnArray, requestAttachment)
@@ -177,7 +177,7 @@ func decodeSWMFile(fileRecord fileAssocStruct, espXmlmc *apiLib.XmlmcInstStruct)
 	file, fileError := os.Open(fullFilePath)
 	//-- Check For Error Reading File
 	if fileError != nil {
-		logger(4, "Error Opening File: "+fmt.Sprintf("%v", fileError), false)
+		logger(4, "Error Opening File: "+fileError.Error(), false)
 		return returnStruct, false
 	}
 	defer file.Close()
@@ -196,7 +196,7 @@ func decodeSWMFile(fileRecord fileAssocStruct, espXmlmc *apiLib.XmlmcInstStruct)
 	espXmlmc.SetParam("fileContent", fileEncoded)
 	XMLEmailDecoded, xmlmcErrEmail := espXmlmc.Invoke("mail", "decodeCompositeMessage")
 	if xmlmcErrEmail != nil {
-		logger(4, "API Error response from decodeCompositeMessage: "+fmt.Sprintf("%v", xmlmcErrEmail), false)
+		logger(4, "API Error response from decodeCompositeMessage: "+xmlmcErrEmail.Error(), false)
 		return returnStruct, false
 	}
 
@@ -218,7 +218,7 @@ func decodeSWMFile(fileRecord fileAssocStruct, espXmlmc *apiLib.XmlmcInstStruct)
 	var xmlResponEmail xmlmcEmailAttachmentResponse
 	errUnmarshall := xml.Unmarshal([]byte(XMLEmailDecoded), &xmlResponEmail)
 	if errUnmarshall != nil {
-		logger(4, "Unable to read XML response from Message Decode: "+fmt.Sprintf("%v", errUnmarshall), false)
+		logger(4, "Unable to read XML response from Message Decode: "+errUnmarshall.Error(), false)
 		return returnStruct, false
 	}
 	if xmlResponEmail.MethodResult != "ok" {
@@ -314,7 +314,7 @@ func addFileContent(entityName string, fileRecord fileAssocStruct, espXmlmc *api
 		var xmlRespon xmlmcAttachmentResponse
 		errXMLMC := xml.Unmarshal([]byte(XMLHistAtt), &xmlRespon)
 		if errXMLMC != nil {
-			logger(4, "Unable to read response from Hornbill instance for Update File Attachment Record Insertion ["+useFileName+"] ["+fileRecord.SmCallRef+"]:"+fmt.Sprintf("%v", errXMLMC), false)
+			logger(4, "Unable to read response from Hornbill instance for Update File Attachment Record Insertion ["+useFileName+"] ["+fileRecord.SmCallRef+"]:"+errXMLMC.Error(), false)
 			if configDebug {
 				logger(1, "File Attachment Record XML "+XMLSTRING, false)
 			}
@@ -346,7 +346,7 @@ func addFileContent(entityName string, fileRecord fileAssocStruct, espXmlmc *api
 	var XMLSTRINGDATA = espXmlmc.GetParam()
 	XMLAttach, xmlmcErr := espXmlmc.Invoke("data", "entityAttachFile")
 	if xmlmcErr != nil {
-		logger(4, "Could not add Attachment File Data for ["+useFileName+"] ["+fileRecord.SmCallRef+"]: "+fmt.Sprintf("%v", xmlmcErr), false)
+		logger(4, "Could not add Attachment File Data for ["+useFileName+"] ["+fileRecord.SmCallRef+"]: "+xmlmcErr.Error(), false)
 		if configDebug {
 			logger(1, "File Data Record XML "+XMLSTRINGDATA, false)
 		}
@@ -356,7 +356,7 @@ func addFileContent(entityName string, fileRecord fileAssocStruct, espXmlmc *api
 
 	err := xml.Unmarshal([]byte(XMLAttach), &xmlRespon)
 	if err != nil {
-		logger(4, "Could not add Attachment File Data for ["+useFileName+"] ["+fileRecord.SmCallRef+"]: "+fmt.Sprintf("%v", err), false)
+		logger(4, "Could not add Attachment File Data for ["+useFileName+"] ["+fileRecord.SmCallRef+"]: "+err.Error(), false)
 		if configDebug {
 			logger(1, "File Data Record XML "+XMLSTRINGDATA, false)
 		}
@@ -368,41 +368,22 @@ func addFileContent(entityName string, fileRecord fileAssocStruct, espXmlmc *api
 			}
 		} else {
 			//-- If we've got a Content Location back from the API, update the file record with this
-			if xmlRespon.ContentLocation != "" {
-				strService := ""
-				strMethod := ""
-				if entityName == "RequestHistoricUpdateAttachments" {
-					espXmlmc.SetParam("application", appServiceManager)
-					espXmlmc.SetParam("entity", "RequestHistoricUpdateAttachments")
-					espXmlmc.OpenElement("primaryEntityData")
-					espXmlmc.OpenElement("record")
-					espXmlmc.SetParam("h_pk_fileid", attPriKey)
-					espXmlmc.SetParam("h_contentlocation", xmlRespon.ContentLocation)
-					espXmlmc.CloseElement("record")
-					espXmlmc.CloseElement("primaryEntityData")
-					strService = "data"
-					strMethod = "entityUpdateRecord"
-				} else {
-					espXmlmc.SetParam("application", appServiceManager)
-					espXmlmc.SetParam("entity", "RequestAttachments")
-					espXmlmc.OpenElement("primaryEntityData")
-					espXmlmc.OpenElement("record")
-					espXmlmc.SetParam("h_request_id", fileRecord.SmCallRef)
-					espXmlmc.SetParam("h_description", fileRecord.Description)
-
-					espXmlmc.SetParam("h_filename", useFileName)
-					espXmlmc.SetParam("h_contentlocation", xmlRespon.ContentLocation)
-					espXmlmc.SetParam("h_timestamp", epochToDateTime(fileRecord.TimeAdded))
-					espXmlmc.SetParam("h_visibility", "trustedGuest")
-					espXmlmc.CloseElement("record")
-					espXmlmc.CloseElement("primaryEntityData")
-					strService = "data"
-					strMethod = "entityAddRecord"
-				}
+			if entityName != "RequestHistoricUpdateAttachments" {
+				espXmlmc.SetParam("application", appServiceManager)
+				espXmlmc.SetParam("entity", "RequestAttachments")
+				espXmlmc.OpenElement("primaryEntityData")
+				espXmlmc.OpenElement("record")
+				espXmlmc.SetParam("h_request_id", fileRecord.SmCallRef)
+				espXmlmc.SetParam("h_description", fileRecord.Description)
+				espXmlmc.SetParam("h_filename", useFileName)
+				espXmlmc.SetParam("h_timestamp", epochToDateTime(fileRecord.TimeAdded))
+				espXmlmc.SetParam("h_visibility", "trustedGuest")
+				espXmlmc.CloseElement("record")
+				espXmlmc.CloseElement("primaryEntityData")
 				XMLSTRINGDATA = espXmlmc.GetParam()
-				XMLContentLoc, xmlmcErrContent := espXmlmc.Invoke(strService, strMethod)
+				XMLContentLoc, xmlmcErrContent := espXmlmc.Invoke("data", "entityAddRecord")
 				if xmlmcErrContent != nil {
-					logger(4, "Could not update request ["+fileRecord.SmCallRef+"] with attachment ["+useFileName+"]: "+fmt.Sprintf("%v", xmlmcErrContent), false)
+					logger(4, "Could not update request ["+fileRecord.SmCallRef+"] with attachment ["+useFileName+"]: "+xmlmcErrContent.Error(), false)
 					if configDebug {
 						logger(1, "File Data Record XML "+XMLSTRINGDATA, false)
 					}
@@ -412,7 +393,7 @@ func addFileContent(entityName string, fileRecord fileAssocStruct, espXmlmc *api
 
 				err = xml.Unmarshal([]byte(XMLContentLoc), &xmlResponLoc)
 				if err != nil {
-					logger(4, "Added file data to but unable to set Content Location on ["+fileRecord.SmCallRef+"] for File Content ["+useFileName+"] - read response from Hornbill instance:"+fmt.Sprintf("%v", err), false)
+					logger(4, "Added file data to but unable to set Content Location on ["+fileRecord.SmCallRef+"] for File Content ["+useFileName+"] - read response from Hornbill instance:"+err.Error(), false)
 					if configDebug {
 						logger(1, "File Data Record XML "+XMLSTRINGDATA, false)
 					}
@@ -426,8 +407,8 @@ func addFileContent(entityName string, fileRecord fileAssocStruct, espXmlmc *api
 					return false
 				}
 				logger(1, entityName+" File Content ["+useFileName+"] Added to ["+fileRecord.SmCallRef+"] Successfully", false)
-				counters.filesAttached++
 			}
+			counters.filesAttached++
 		}
 	}
 	return true
@@ -446,7 +427,7 @@ func getSubFolderName(fileCallRef string) string {
 func getCallRefInt(callRef string) string {
 	re1, err := regexp.Compile(`[0-9]+`)
 	if err != nil {
-		logger(4, "Error converting string Supportworks call reference:"+fmt.Sprintf("%v", err), false)
+		logger(4, "Error converting string Supportworks call reference:"+err.Error(), false)
 	}
 	result := strings.TrimLeft(re1.FindString(callRef), "0")
 	return result
