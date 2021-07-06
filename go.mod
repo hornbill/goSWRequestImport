@@ -9,7 +9,7 @@ require (
 	github.com/google/go-querystring v1.1.0 // indirect
 	github.com/hashicorp/go-version v1.3.0 // indirect
 	github.com/hornbill/go-mssqldb v0.0.0-20151214165723-4623535a2b1c
-	github.com/hornbill/goApiLib v0.0.0-20210209150605-33738d4bdd48
+	github.com/hornbill/goApiLib v0.0.0-20210702135347-bcef2b442dbc
 	github.com/hornbill/mysql v1.0.3
 	github.com/hornbill/mysql320 v0.0.0-20190222164158-6b94c17c0207
 	github.com/hornbill/pb v0.0.0-20151205101406-5d91ad42e9c1

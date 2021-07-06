@@ -12,8 +12,8 @@ github.com/hashicorp/go-version v1.3.0 h1:McDWVJIU/y+u1BRV06dPaLfLCaT7fUTJLp5r04
 github.com/hashicorp/go-version v1.3.0/go.mod h1:fltr4n8CU8Ke44wwGCBoEymUuxUHl09ZGVZPK5anwXA=
 github.com/hornbill/go-mssqldb v0.0.0-20151214165723-4623535a2b1c h1:lqGLgUkwvFlzDdLGnxKatu692ApLEqmWUpZzDobI5Io=
 github.com/hornbill/go-mssqldb v0.0.0-20151214165723-4623535a2b1c/go.mod h1:IZ1HiEpyQq/NRYQz/Pb/nbg/vVD4L6i242bbKRu4nV4=
-github.com/hornbill/goApiLib v0.0.0-20210209150605-33738d4bdd48 h1:xIivnX9Jk02w+ivbklKAQnIVswhUNr17ReUf+hf5QLQ=
-github.com/hornbill/goApiLib v0.0.0-20210209150605-33738d4bdd48/go.mod h1:zkR9RzTonmWt1vYmKGuF9I+5bOFxVONc4xbR6mJFDVI=
+github.com/hornbill/goApiLib v0.0.0-20210702135347-bcef2b442dbc h1:8MaZBmb1wbfaYP+S6Hm6vDLxnlnfJcsRN8t5RdA+W6I=
+github.com/hornbill/goApiLib v0.0.0-20210702135347-bcef2b442dbc/go.mod h1:CbxTQVBE4NWPfLP2+d9TWZk7luhH6ZyDK1UHlvzvxPs=
 github.com/hornbill/mysql v1.0.3 h1:lkAYcJuO16Qc8V9SUDzjj7HcfYiKIkIY7G/glf2zbaA=
 github.com/hornbill/mysql v1.0.3/go.mod h1:LKQdjXQqEh9f0/nCQJ4gekIk6MQZN43KW/x9nQB61Lk=
 github.com/hornbill/mysql320 v0.0.0-20190222164158-6b94c17c0207 h1:B65Y4XQOSIhBucSAf7/Oofg1QAuu5+WqmFQPrHAsc2c=
