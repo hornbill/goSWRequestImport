@@ -417,13 +417,17 @@ func logNewCall(jobs chan RequestDetails, wg *sync.WaitGroup, espXmlmc *apiLib.X
 
 		//-- Check for Dry Run
 		if !configDryRun {
-			//XMLRequest := espXmlmc.GetParam()
+			XMLRequest := espXmlmc.GetParam()
 			if configDebug {
-				buffer.WriteString(loggerGen(1, "entityAddRecord::Requests:"+espXmlmc.GetParam()))
+				buffer.WriteString(loggerGen(1, "entityAddRecord::Requests:"+XMLRequest))
 			}
 			XMLCreate, xmlmcErr := espXmlmc.Invoke("data", "entityAddRecord")
 			if xmlmcErr != nil {
 				buffer.WriteString(loggerGen(4, xmlmcErr.Error()))
+				if configSplitLogs {
+					uploadLogger(xmlmcErr.Error())
+					uploadLogger(XMLRequest)
+				}
 				continue
 			}
 			var xmlRespon xmlmcRequestResponseStruct
@@ -433,7 +437,11 @@ func logNewCall(jobs chan RequestDetails, wg *sync.WaitGroup, espXmlmc *apiLib.X
 				mutexCounters.Lock()
 				counters.createdSkipped++
 				mutexCounters.Unlock()
-				buffer.WriteString(loggerGen(4, xmlmcErr.Error()))
+				buffer.WriteString(loggerGen(4, err.Error()))
+				if configSplitLogs {
+					uploadLogger(err.Error())
+					uploadLogger(XMLRequest)
+				}
 				continue
 			}
 			if xmlRespon.MethodResult != "ok" {
@@ -441,6 +449,10 @@ func logNewCall(jobs chan RequestDetails, wg *sync.WaitGroup, espXmlmc *apiLib.X
 				counters.createdSkipped++
 				mutexCounters.Unlock()
 				buffer.WriteString(loggerGen(4, "Log Request Failed ["+xmlRespon.State.ErrorRet+"]"))
+				if configSplitLogs {
+					uploadLogger(xmlRespon.State.ErrorRet)
+					uploadLogger(XMLRequest)
+				}
 			} else {
 				strNewCallRef = xmlRespon.RequestID
 				buffer.WriteString(loggerGen(1, "Log Request Successful ["+strNewCallRef+"]"))

@@ -8,11 +8,12 @@ import (
 
 	"github.com/tcnksm/go-latest" //-- For Version checking
 
-	"github.com/fatih/color"
+	"github.com/hornbill/sqlx"
+	//SQL Drivers
+	_ "github.com/alexbrainman/odbc"
 	_ "github.com/hornbill/go-mssqldb" //Microsoft SQL Server driver - v2005+
 	_ "github.com/hornbill/mysql"      //MySQL v4.1 to v5.x and MariaDB driver
 	_ "github.com/hornbill/mysql320"   //MySQL v3.2.0 to v5 driver - Provides SWSQL (MySQL 4.0.16) support - originally weave-lab
-	"github.com/hornbill/sqlx"
 )
 
 // main package
@@ -39,15 +40,15 @@ func main() {
 	//Check maxGoroutines for valid value
 	maxRoutines, err := strconv.Atoi(configMaxRoutines)
 	if err != nil {
-		color.Red("Unable to convert maximum concurrency of [" + configMaxRoutines + "] to type INT for processing")
+		logger(4, "Unable to convert maximum concurrency of ["+configMaxRoutines+"] to type INT for processing", true)
 		return
 	}
 	maxGoroutines = maxRoutines
 
 	if maxGoroutines < 1 || maxGoroutines > 10 {
-		color.Red("The maximum concurrent requests allowed is between 1 and 10 (inclusive).\n\n")
-		color.Red("You have selected " + configMaxRoutines + ". Please try again, with a valid value against ")
-		color.Red("the -concurrent switch.")
+		logger(4, "The maximum concurrent requests allowed is between 1 and 10 (inclusive).\n\n", true)
+		logger(4, "You have selected "+configMaxRoutines+". Please try again, with a valid value against ", true)
+		logger(4, "the -concurrent switch.", true)
 		return
 	}
 
@@ -65,7 +66,7 @@ func main() {
 	}
 	if swImportConf.SWAppDBConf.Driver == "swsql" {
 		appDBDriver = "mysql320"
-	} else if swImportConf.SWAppDBConf.Driver == "mysql" || swImportConf.SWAppDBConf.Driver == "mssql" || swImportConf.SWAppDBConf.Driver == "mysql320" {
+	} else if swImportConf.SWAppDBConf.Driver == "mysql" || swImportConf.SWAppDBConf.Driver == "mssql" || swImportConf.SWAppDBConf.Driver == "mysql320" || swImportConf.SWAppDBConf.Driver == "odbc" || swImportConf.SWAppDBConf.Driver == "ODBC" {
 		appDBDriver = swImportConf.SWAppDBConf.Driver
 	} else {
 		logger(4, "The SQL driver ("+swImportConf.SWAppDBConf.Driver+") for the Supportworks Application Database specified in the configuration file is not valid.", true)
@@ -108,7 +109,8 @@ func main() {
 	defer dbsys.Close()
 
 	var db2err error
-	dbapp, db2err = sqlx.Open(cacheDBDriver, connStrAppDB)
+	//fmt.Println(connStrAppDB)
+	dbapp, db2err = sqlx.Open(appDBDriver, connStrAppDB)
 	if db2err != nil {
 		logger(4, "Could not open app DB connection"+db2err.Error(), true)
 		return
@@ -137,6 +139,7 @@ func main() {
 	}
 
 	//-- End output
+	logger(1, "Requests Returned: "+fmt.Sprintf("%d", counters.callsReturned), true)
 	logger(1, "Requests Logged: "+fmt.Sprintf("%d", counters.created), true)
 	logger(1, "Requests Skipped: "+fmt.Sprintf("%d", counters.createdSkipped), true)
 	if counters.existingRequests > 0 {

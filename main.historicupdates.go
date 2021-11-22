@@ -10,6 +10,8 @@ import (
 
 	apiLib "github.com/hornbill/goApiLib"
 	"github.com/hornbill/sqlx"
+	//SQL Drivers
+	_ "github.com/alexbrainman/odbc"
 )
 
 //applyHistoricalUpdates - takes call diary records from Supportworks, imports to Hornbill as Historical Updates

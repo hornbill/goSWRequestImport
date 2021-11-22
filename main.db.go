@@ -6,8 +6,9 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/fatih/color"
 	"github.com/hornbill/sqlx"
+	//SQL Drivers
+	_ "github.com/alexbrainman/odbc"
 )
 
 //buildConnectionString -- Build the connection string for the SQL driver
@@ -47,6 +48,18 @@ func buildConnectionString(strDataSource string) string {
 			dbPortSetting := strconv.Itoa(swImportConf.SWAppDBConf.Port)
 			connectString = "tcp:" + swImportConf.SWAppDBConf.Server + ":" + dbPortSetting
 			connectString = connectString + "*" + swImportConf.SWAppDBConf.Database + "/" + swImportConf.SWAppDBConf.UserName + "/" + swImportConf.SWAppDBConf.Password
+
+		case "odbc":
+			//connectString = swImportConf.SWAppDBConf.UserName +"/"+swImportConf.SWAppDBConf.Password+"@"+swImportConf.SWAppDBConf.Server+":"+strconv.Itoa(swImportConf.SWAppDBConf.Port)+"/"+swImportConf.SWAppDBConf.Database
+			connectString = "DSN=" + swImportConf.SWAppDBConf.Database + ";UID=" + swImportConf.SWAppDBConf.UserName + ";PWD=" + swImportConf.SWAppDBConf.Password
+		case "ODBC":
+			if swImportConf.SWAppDBConf.ConnectionString != "" {
+				connectString = swImportConf.SWAppDBConf.ConnectionString
+				appDBDriver = "odbc"
+			} else {
+				logger(4, "Connection String not set.", true)
+				return ""
+			}
 		}
 	} else if strDataSource == "cache" {
 		//Build & return sw_systemdb connection string
@@ -104,6 +117,11 @@ func queryDBCallDetails(callClass, swCallClass, connString string) bool {
 	intCallCount := 0
 	for rows.Next() {
 		intCallCount++
+
+		mutexCounters.Lock()
+		counters.callsReturned++
+		mutexCounters.Unlock()
+
 		results := make(map[string]interface{})
 		err = rows.MapScan(results)
 		if err != nil {
@@ -123,7 +141,7 @@ func getFieldValue(v string, u map[string]interface{}) string {
 	//-- Match $variable from String
 	re1, err := regexp.Compile(`\[(.*?)\]`)
 	if err != nil {
-		color.Red("[ERROR] %v", err)
+		logger(4, err.Error(), true)
 	}
 
 	result := re1.FindAllString(fieldMap, 100)

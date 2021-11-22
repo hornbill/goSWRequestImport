@@ -166,6 +166,7 @@ func login() bool {
 //-- Adds details to log file, ends user ESP session
 func logout() {
 	//-- End output
+	espLogger("Requests Returned: "+fmt.Sprintf("%d", counters.callsReturned), "debug")
 	espLogger("Requests Logged: "+fmt.Sprintf("%d", counters.created), "debug")
 	espLogger("Requests Skipped: "+fmt.Sprintf("%d", counters.createdSkipped), "debug")
 	espLogger("Time Taken: "+fmt.Sprintf("%v", endTime), "debug")

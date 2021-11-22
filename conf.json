@@ -17,6 +17,7 @@
     "Database": "swdata",
     "UserName": "dbusername",
     "Password": "dbpassword",
+    "ConnectionString": "Only_Used_IF_Driver=ODBC",
     "Port": 5002,
     "Encrypt": false
   },

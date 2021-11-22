@@ -1,5 +1,16 @@
 # CHANGELOG
 
+## 1.13.0 (November 22nd, 2021)
+
+Changes:
+
+- Addition of ODBC as database driver
+-- lowercase "odbc" allows for DSN/User/Password
+-- UPPERCASE "ODBC" allows for ConnectionString to be used in conf.json
+- Modifications to logging.
+-- new command line flag (-splitlogs) to split out logs in three.
+- Amount of calls returned from Sw now in totals tally.
+
 ## 1.12.0 (June 23rd, 2021)
 
 Changes:
@@ -7,7 +18,7 @@ Changes:
 - Removed references to content location for file attachments, as this is no longer required
 - Added support for Release Request workflows to be spawned 
 
-##Â 1.11.0 (August 25th, 2020)
+## 1.11.0 (August 25th, 2020)
 
 Changes:
 
@@ -21,7 +32,7 @@ Fix:
 
 - Fixed issue with owner mapping
 
-##Â 1.10.1 (April 15th, 2020)
+## 1.10.1 (April 15th, 2020)
 
 Change:
 

@@ -3,6 +3,7 @@ module github.com/hornbill/goSWRequestImport
 go 1.16
 
 require (
+	github.com/alexbrainman/odbc v0.0.0-20210605012845-39f8520b0d5f
 	github.com/fatih/color v1.12.0
 	github.com/go-sql-driver/mysql v1.6.0 // indirect
 	github.com/google/go-github v17.0.0+incompatible // indirect

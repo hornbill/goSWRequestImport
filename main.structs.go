@@ -6,10 +6,12 @@ import (
 
 	apiLib "github.com/hornbill/goApiLib"
 	"github.com/hornbill/sqlx"
+	//SQL Drivers
+	_ "github.com/alexbrainman/odbc"
 )
 
 const (
-	version           = "1.12.0"
+	version           = "1.13.0"
 	repo              = "goSWRequestImport"
 	appServiceManager = "com.hornbill.servicemanager"
 )
@@ -27,6 +29,7 @@ var (
 	configCustomerOrg      bool
 	configMaxRoutines      string
 	configVersion          bool
+	configSplitLogs        bool
 	connStrSysDB           string
 	connStrAppDB           string
 	espXmlmc               *apiLib.XmlmcInstStruct
@@ -73,6 +76,7 @@ type counterTypeStruct struct {
 	created          int
 	createdSkipped   int
 	existingRequests int
+	callsReturned    int
 	filesAttached    int
 }
 
@@ -112,13 +116,14 @@ type sysDBConfStruct struct {
 	Password string
 }
 type appDBConfStruct struct {
-	Driver   string
-	Server   string
-	UserName string
-	Password string
-	Port     int
-	Database string
-	Encrypt  bool
+	Driver           string
+	Server           string
+	UserName         string
+	Password         string
+	ConnectionString string
+	Port             int
+	Database         string
+	Encrypt          bool
 }
 type swCallConfStruct struct {
 	Import                 bool

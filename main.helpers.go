@@ -151,6 +151,40 @@ func logger(t int, s string, outputtoCLI bool) {
 	log.Println(errorLogPrefix + s)
 }
 
+func uploadLogger(s string) {
+	cwd, _ := os.Getwd()
+	logPath := cwd + "/log"
+	logFileName := logPath + "/SW_Call_Import_Upload_Fail_" + timeNow + ".log"
+
+	//-- If Folder Does Not Exist then create it
+	if _, err := os.Stat(logPath); os.IsNotExist(err) {
+		err := os.Mkdir(logPath, 0777)
+		if err != nil {
+			color.Red("Error Creating Log Folder %q: %s \r", logPath, err)
+			os.Exit(101)
+		}
+	}
+
+	//-- Open Log File
+	f, err := os.OpenFile(logFileName, os.O_APPEND|os.O_CREATE|os.O_RDWR, 0777)
+	// don't forget to close it
+	if err != nil {
+		//We didnt manage to open the log file so exit the function
+		return
+	}
+	defer f.Close()
+	if err != nil {
+		color.Red("Error Creating Upload Failure Log File %q: %s \n", logFileName, err)
+		os.Exit(100)
+	}
+	// assign it to the standard logger
+	log.SetOutput(f)
+	//var errorLogPrefix string
+	//-- Create Log Entry
+
+	log.Println(s)
+}
+
 //epochToDateTime - converts an EPOCH value STRING var in to a date-time format compatible with Hornbill APIs
 func epochToDateTime(epochDateString string) string {
 	dateTime := ""
@@ -197,6 +231,7 @@ func parseFlags() {
 	flag.BoolVar(&configCustomerOrg, "custorg", false, "Adopt Contact Organisation or User Company for the call rather than mapped values")
 	flag.BoolVar(&boolProcessAttachments, "attachments", false, "Import attachemnts without prompting.")
 	flag.BoolVar(&configVersion, "version", false, "Returns the version of the tool before exiting")
+	flag.BoolVar(&configSplitLogs, "splitlogs", false, "Splits the log file into three different logs")
 	flag.Parse()
 }
 
