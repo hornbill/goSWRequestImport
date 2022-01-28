@@ -1,5 +1,10 @@
 # CHANGELOG
 
+## 1.13.1 (January 28th, 2022)
+
+Fix:
+- Fixed prefix issue caused by API change
+
 ## 1.13.0 (November 22nd, 2021)
 
 Changes:
