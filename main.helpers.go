@@ -262,7 +262,7 @@ func getRequestPrefix(callclass string) string {
 
 	espXmlmc.SetParam("appName", appServiceManager)
 	espXmlmc.SetParam("filter", strSetting)
-	response, err := espXmlmc.Invoke("admin", "getApplicationOption")
+	response, err := espXmlmc.Invoke("session", "getApplicationOption")
 	if err != nil {
 		logger(4, "Could not retrieve System Setting for Request Prefix. Using default ["+callclass+"].", false)
 		return callclass
