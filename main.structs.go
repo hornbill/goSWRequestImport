@@ -6,12 +6,13 @@ import (
 
 	apiLib "github.com/hornbill/goApiLib"
 	"github.com/hornbill/sqlx"
+
 	//SQL Drivers
 	_ "github.com/alexbrainman/odbc"
 )
 
 const (
-	version           = "1.13.2"
+	version           = "1.14.0"
 	repo              = "goSWRequestImport"
 	appServiceManager = "com.hornbill.servicemanager"
 )

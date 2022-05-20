@@ -517,6 +517,9 @@ func logNewCall(jobs chan RequestDetails, wg *sync.WaitGroup, espXmlmc *apiLib.X
 					}
 				}
 
+				//Now add status history
+				addStatusHistory(strNewCallRef, strStatus, strLoggedDate, espXmlmc, &buffer)
+
 				//Now do BPM Processing
 				if strStatus != "status.resolved" &&
 					strStatus != "status.closed" &&
@@ -618,4 +621,36 @@ func logNewCall(jobs chan RequestDetails, wg *sync.WaitGroup, espXmlmc *apiLib.X
 		bufferMutex.Unlock()
 		buffer.Reset()
 	}
+}
+
+func addStatusHistory(requestRef, requestStatus, dateLogged string, espXmlmc *apiLib.XmlmcInstStruct, buffer *bytes.Buffer) {
+	espXmlmc.SetParam("application", "com.hornbill.servicemanager")
+	espXmlmc.SetParam("entity", "RequestStatusHistory")
+	espXmlmc.OpenElement("primaryEntityData")
+	espXmlmc.OpenElement("record")
+	espXmlmc.SetParam("h_request_id", requestRef)
+	espXmlmc.SetParam("h_status", requestStatus)
+	espXmlmc.SetParam("h_timestamp", dateLogged)
+	espXmlmc.CloseElement("record")
+	espXmlmc.CloseElement("primaryEntityData")
+	XMLPub := espXmlmc.GetParam()
+	XMLPublish, xmlmcErr := espXmlmc.Invoke("data", "entityAddRecord")
+	if xmlmcErr != nil {
+		buffer.WriteString(loggerGen(4, "XMLMC error: Unable to add status history record for ["+requestRef+"] : "+xmlmcErr.Error()))
+		buffer.WriteString(loggerGen(1, XMLPub))
+		return
+	}
+	var xmlRespon xmlmcResponse
+	errLogDate := xml.Unmarshal([]byte(XMLPublish), &xmlRespon)
+	if errLogDate != nil {
+		buffer.WriteString(loggerGen(4, "Unmarshal error: Unable to add status history record for ["+requestRef+"] : "+errLogDate.Error()))
+		buffer.WriteString(loggerGen(1, XMLPub))
+		return
+	}
+	if xmlRespon.MethodResult != "ok" {
+		buffer.WriteString(loggerGen(4, "MethodResult not OK: Unable to add status history record for ["+requestRef+"] : "+xmlRespon.State.ErrorRet))
+		buffer.WriteString(loggerGen(1, XMLPub))
+		return
+	}
+	buffer.WriteString(loggerGen(1, "Request Status History record success: ["+requestRef+"]"))
 }

@@ -1,5 +1,11 @@
 # CHANGELOG
 
+## 1.14.0 (May 20th, 2022)
+
+###Â Feature 
+
+- Added logic to create initial status history record, to support changes in Service Manager
+
 ## 1.13.2 (April 1st, 2022)
 
 Change:
@@ -35,7 +41,7 @@ Changes:
 - Removed references to content location for file attachments, as this is no longer required
 - Added support for Release Request workflows to be spawned 
 
-## 1.11.0 (August 25th, 2020)
+##ï¿½1.11.0 (August 25th, 2020)
 
 Changes:
 
@@ -49,7 +55,7 @@ Fix:
 
 - Fixed issue with owner mapping
 
-## 1.10.1 (April 15th, 2020)
+##ï¿½1.10.1 (April 15th, 2020)
 
 Change:
 
