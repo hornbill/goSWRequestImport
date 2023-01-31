@@ -1,8 +1,14 @@
 # CHANGELOG
 
+## 1.15.0 (January 31st, 2023)
+
+### Feature/Fix
+
+- Replacement of .swm translation code to allow for import of Sw email files.
+
 ## 1.14.0 (May 20th, 2022)
 
-### Feature 
+### Feature 
 
 - Added logic to create initial status history record, to support changes in Service Manager
 

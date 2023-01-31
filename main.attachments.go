@@ -12,6 +12,13 @@ import (
 	"strings"
 	"unicode/utf8"
 
+	"archive/zip"
+	"bytes"
+	"io"
+	"net/mail"
+	"github.com/vraycc/go-parsemail"
+
+
 	apiLib "github.com/hornbill/goApiLib"
 	"github.com/hornbill/pb"
 )
@@ -62,7 +69,8 @@ func processFileAttachments(swCallRef, smCallRef string, espXmlmc *apiLib.XmlmcI
 			}
 			//Further processing for SWM files
 			//Copy content in to TXT file, and attach this instead
-			swmDecoded, boolDecoded := decodeSWMFile(fileRecord, espXmlmc)
+//			swmDecoded, boolDecoded := decodeSWMFile(fileRecord, espXmlmc)
+			swmDecoded, boolDecoded := decodeSWMFile(fileRecord)
 			if boolDecoded {
 				if swmDecoded.Content != "" {
 					fileRecord.FileData = base64.StdEncoding.EncodeToString([]byte(swmDecoded.Content))
@@ -159,7 +167,7 @@ func fileAttachmentData(swRequest, smRequest string) []fileAssocStruct {
 }
 
 //decodeSWMFile - reads the email attachment from Supportworks, returns the content & any attachments within
-func decodeSWMFile(fileRecord fileAssocStruct, espXmlmc *apiLib.XmlmcInstStruct) (swmStruct, bool) {
+func decodeSWMFile(fileRecord fileAssocStruct) (swmStruct, bool) {
 	var returnStruct swmStruct
 	returnStruct.Content = ""
 	returnStruct.Subject = ""
@@ -168,38 +176,158 @@ func decodeSWMFile(fileRecord fileAssocStruct, espXmlmc *apiLib.XmlmcInstStruct)
 	hostFileName := padCallRef(fileRecord.CallRef, "f", 8) + "." + padCallRef(fileRecord.DataID, "", 3)
 	fullFilePath := swImportConf.AttachmentRoot + "/" + subFolderName + "/" + hostFileName
 	logger(1, "Decoding email file ["+fileRecord.FileName+"] from: "+fullFilePath, false)
+	
 	//Get File Data
 	if _, fileCheckErr := os.Stat(fullFilePath); os.IsNotExist(fileCheckErr) {
 		logger(4, "File does not exist at location.", false)
 		return returnStruct, false
 	}
-	//-- Load File
-	file, fileError := os.Open(fullFilePath)
-	//-- Check For Error Reading File
-	if fileError != nil {
-		logger(4, "Error Opening File: "+fileError.Error(), false)
+	
+	// Open a zip archive for reading.
+	r, err := zip.OpenReader(fullFilePath)
+	if err != nil {
+		logger(4, "Error Opening File: "+err.Error(), false)
 		return returnStruct, false
 	}
-	defer file.Close()
-	// create a new buffer base on file size
-	fInfo, _ := file.Stat()
-	size := fInfo.Size()
-	buf := make([]byte, size)
+	defer r.Close()
 
-	// read file content into buffer
-	fReader := bufio.NewReader(file)
-	fReader.Read(buf)
-	fileEncoded := base64.StdEncoding.EncodeToString(buf)
+	//there should only be a single file
+	
+	if len(r.File) == 1 {
+		f := r.File[0]
+		rc, err := f.Open()
+		if err != nil {
+			logger(4, "Unable to read zipped file: "+err.Error(), false)
+			return returnStruct, false
+		}
+		
+		m, err := parsemail.Parse(rc)
+		if err != nil {
+			logger(4, "Unable to parse email: "+err.Error(), false)
+			return returnStruct, false
+		}
+		defer rc.Close()
+		
+		//Build string to write to text file
+		fromAddress := ""
+		toAddress := ""
+		if len(m.From) == 0 && len(m.To) == 0 {
+			logger(4, "No recipients found in mail message - second attempt", false)
+			f := r.File[0]
+			rc, err := f.Open()
+			if err != nil {
+				logger(4, "Unable to read zipped file: "+err.Error(), false)
+				return returnStruct, false
+			}
+			q, err := mail.ReadMessage(rc)
+			if err != nil {
+				logger(4, "Unable to parse net/email: "+err.Error(), false)
+				return returnStruct, false
+			}
+			fromAddress = q.Header.Get("From")
+			toAddress = q.Header.Get("To")
+			defer rc.Close()
+		} else {
+			if len(m.From) > 0 {
+				fromAddress = m.From[0].Address
+			}
+			if len(m.To) > 0 {
+				toAddress = m.To[0].Address
+			}
+		}
+/*		
+		if len(...FileAttachments) > 0 {
+			returnStruct.Attachments = xmlResponEmail.FileAttachments
+		}
+*/
+		//fmt.Println("Count:", len(m.Attachments))
+		for _, a := range(m.Attachments) {
+			var attachmentFile fileAttachStruct
+			if a.Filename != "" {
+				attachmentFile.FileName = a.Filename
+			}
+			w := &bytes.Buffer{}
+			enc := base64.NewEncoder(base64.StdEncoding, w)
+			if _, err := io.Copy(enc, a.Data); err != nil {
+				logger(4, "Issue with Attachment: " + err.Error(), false)
+			}
+			if err := enc.Close(); err != nil {
+				logger(4, "Issue with Attachment Close: " + err.Error(), false)
+			}
+			attachmentFile.FileData = w.String()
+//fmt.Println(attachmentFile.FileData)
+			if a.ContentType != "" {
+				attachmentFile.MIMEType = a.ContentType
+			}
+			if attachmentFile.FileData != "" {
+				returnStruct.Attachments = append(returnStruct.Attachments, attachmentFile)
+			}
+		    //fmt.Println(a.Data)
+		    //and read a.Data
+		}
+		//fmt.Println("Count:", len(m.EmbeddedFiles))
+		for _, a := range(m.EmbeddedFiles) {
+			var attachmentFile fileAttachStruct
+			if (a.CID != "") {
+				attachmentFile.ContentID = a.CID
+			}
 
-	//Decode SWM in to struct
+			w := &bytes.Buffer{}
+			enc := base64.NewEncoder(base64.StdEncoding, w)
+			if _, err := io.Copy(enc, a.Data); err != nil {
+				logger(4, "Issue with Attachment: " + err.Error(), false)
+			}
+			if err := enc.Close(); err != nil {
+				logger(4, "Issue with Attachment Close: " + err.Error(), false)
+			}
+			attachmentFile.FileData = w.String()
+			if a.ContentType != "" {
+				brokenstring := strings.Split(a.ContentType, ";")
+				if len(brokenstring) == 1 {
+					attachmentFile.MIMEType = a.ContentType
+				} else if len(brokenstring) > 1 {
+					attachmentFile.MIMEType = brokenstring[0]
+					//stripping ' name="'
+					if brokenstring[1][:7] == " name=\"" {
+						attachmentFile.FileName = brokenstring[1][7:len(brokenstring[1])-1]
+					}
+				}
+			}
+			if attachmentFile.FileData != "" {
+				returnStruct.Attachments = append(returnStruct.Attachments, attachmentFile)
+			}
+		}
 
-	espXmlmc.SetParam("fileContent", fileEncoded)
-	XMLEmailDecoded, xmlmcErrEmail := espXmlmc.Invoke("mail", "decodeCompositeMessage")
-	if xmlmcErrEmail != nil {
-		logger(4, "API Error response from decodeCompositeMessage: "+xmlmcErrEmail.Error(), false)
+
+		bodyText := ""
+		if m.TextBody != "" {
+			bodyText = m.TextBody
+		} else {
+			bodyText = m.HTMLBody
+		}
+		RFCHeader := processSWMHeader(m.Header)
+		//fmt.Println(RFCHeader)
+		returnStruct.Subject = "Subject: " + m.Subject
+//		returnStruct.Content = "RFC Header: " + strings.Replace(m.Header, "\n", "\r\n", -1) + "\r\n" + strings.Repeat("-", 50) + "\r\n"
+		returnStruct.Content = "RFC Header: " + RFCHeader + "\r\n" + strings.Repeat("-", 50) + "\r\n"
+		returnStruct.Content = returnStruct.Content + "From: " + fromAddress + "\r\n"
+		returnStruct.Content = returnStruct.Content + "To: " + toAddress + "\r\n"
+		if !m.Date.IsZero() {
+			returnStruct.Content = returnStruct.Content + "Sent: " + m.Date.Format("Mon Jan 02 15:04:05 -0700 2006") + "\r\n"
+		}
+		returnStruct.Content = returnStruct.Content + returnStruct.Subject + "\r\n"
+		returnStruct.Content = returnStruct.Content + strings.Repeat("-", 50) + "\r\n"
+		returnStruct.Content = returnStruct.Content + strings.Replace(bodyText, "\n", "\r\n", -1)
+		
+//	fmt.Println(returnStruct)	
+		return returnStruct, true
+
+	} else {
+		logger(4, "More than one file in swm zip", false)
 		return returnStruct, false
 	}
-
+	
+/*
 	//Strip non-utf-8 characters from decoded email response
 	if !utf8.ValidString(XMLEmailDecoded) {
 		v := make([]rune, 0, len(XMLEmailDecoded))
@@ -214,57 +342,169 @@ func decodeSWMFile(fileRecord fileAssocStruct, espXmlmc *apiLib.XmlmcInstStruct)
 		}
 		XMLEmailDecoded = string(v)
 	}
+*/
 
-	var xmlResponEmail xmlmcEmailAttachmentResponse
-	errUnmarshall := xml.Unmarshal([]byte(XMLEmailDecoded), &xmlResponEmail)
-	if errUnmarshall != nil {
-		logger(4, "Unable to read XML response from Message Decode: "+errUnmarshall.Error(), false)
-		return returnStruct, false
-	}
-	if xmlResponEmail.MethodResult != "ok" {
-		logger(4, "Error returned from API for Message Decode: "+fmt.Sprintf("%v", xmlResponEmail.MethodResult), false)
-		return returnStruct, false
-	}
-
-	if xmlResponEmail.Recipients == nil {
-		logger(4, "No recipients found in mail message.", false)
-		return returnStruct, false
-	}
-
-	if len(xmlResponEmail.FileAttachments) > 0 {
-		returnStruct.Attachments = xmlResponEmail.FileAttachments
-	}
-
-	//Build string to write to text file
-	fromAddress := ""
-	toAddress := ""
-	for _, recipient := range xmlResponEmail.Recipients {
-		if recipient.Class == "from" {
-			fromAddress = recipient.Address
-		}
-		if recipient.Class == "to" {
-			toAddress = recipient.Address
-		}
-	}
-	bodyText := ""
-	if xmlResponEmail.Body != "" {
-		bodyText = xmlResponEmail.Body
-	} else {
-		bodyText = xmlResponEmail.HTMLBody
-	}
-
-	returnStruct.Subject = "Subject: " + xmlResponEmail.Subject
-	returnStruct.Content = "RFC Header: " + strings.Replace(xmlResponEmail.RFCHeader, "\n", "\r\n", -1) + "\r\n" + strings.Repeat("-", 50) + "\r\n"
-	returnStruct.Content = returnStruct.Content + "From: " + fromAddress + "\r\n"
-	returnStruct.Content = returnStruct.Content + "To: " + toAddress + "\r\n"
-	if xmlResponEmail.TimeSent != "" {
-		returnStruct.Content = returnStruct.Content + "Sent: " + xmlResponEmail.TimeSent + "\r\n"
-	}
-	returnStruct.Content = returnStruct.Content + returnStruct.Subject + "\r\n"
-	returnStruct.Content = returnStruct.Content + strings.Repeat("-", 50) + "\r\n"
-	returnStruct.Content = returnStruct.Content + strings.Replace(bodyText, "\n", "\r\n", -1)
-	return returnStruct, true
 }
+
+func decodeSWMFile23(fileRecord fileAssocStruct) (swmStruct, bool) {
+	var returnStruct swmStruct
+	returnStruct.Content = ""
+	returnStruct.Subject = ""
+
+	subFolderName := getSubFolderName(fileRecord.CallRef)
+	hostFileName := padCallRef(fileRecord.CallRef, "f", 8) + "." + padCallRef(fileRecord.DataID, "", 3)
+	fullFilePath := swImportConf.AttachmentRoot + "/" + subFolderName + "/" + hostFileName
+	logger(1, "Decoding email file ["+fileRecord.FileName+"] from: "+fullFilePath, false)
+	
+	//Get File Data
+	if _, fileCheckErr := os.Stat(fullFilePath); os.IsNotExist(fileCheckErr) {
+		logger(4, "File does not exist at location.", false)
+		return returnStruct, false
+	}
+	
+	// Open a zip archive for reading.
+	r, err := zip.OpenReader(fullFilePath)
+	if err != nil {
+		logger(4, "Error Opening File: "+err.Error(), false)
+		return returnStruct, false
+	}
+	defer r.Close()
+
+	//there should only be a single file
+	
+	if len(r.File) == 1 {
+		f := r.File[0]
+		rc, err := f.Open()
+		if err != nil {
+			logger(4, "Unable to read zipped file: "+err.Error(), false)
+			return returnStruct, false
+		}
+		
+		m, err := parsemail.Parse(rc)
+		if err != nil {
+			logger(4, "Unable to parse email: "+err.Error(), false)
+			return returnStruct, false
+		}
+		defer rc.Close()
+		
+		if len(m.From) == 0 && len(m.To) == 0 {
+			logger(4, "No recipients found in mail message.", false)
+			return returnStruct, false
+		}
+/*		
+		if len(...FileAttachments) > 0 {
+			returnStruct.Attachments = xmlResponEmail.FileAttachments
+		}
+*/
+		//fmt.Println("Count:", len(m.Attachments))
+		for _, a := range(m.Attachments) {
+			var attachmentFile fileAttachStruct
+			if a.Filename != "" {
+				attachmentFile.FileName = a.Filename
+			}
+			w := &bytes.Buffer{}
+			enc := base64.NewEncoder(base64.StdEncoding, w)
+			if _, err := io.Copy(enc, a.Data); err != nil {
+				logger(4, "Issue with Attachment: " + err.Error(), false)
+			}
+			if err := enc.Close(); err != nil {
+				logger(4, "Issue with Attachment Close: " + err.Error(), false)
+			}
+			attachmentFile.FileData = w.String()
+fmt.Println(attachmentFile.FileData)
+			if a.ContentType != "" {
+				attachmentFile.MIMEType = a.ContentType
+			}
+			if attachmentFile.FileData != "" {
+				returnStruct.Attachments = append(returnStruct.Attachments, attachmentFile)
+			}
+		    //fmt.Println(a.Data)
+		    //and read a.Data
+		}
+		//fmt.Println("Count:", len(m.EmbeddedFiles))
+		for _, a := range(m.EmbeddedFiles) {
+			var attachmentFile fileAttachStruct
+			if (a.CID != "") {
+				attachmentFile.ContentID = a.CID
+			}
+
+			w := &bytes.Buffer{}
+			enc := base64.NewEncoder(base64.StdEncoding, w)
+			if _, err := io.Copy(enc, a.Data); err != nil {
+				logger(4, "Issue with Attachment: " + err.Error(), false)
+			}
+			if err := enc.Close(); err != nil {
+				logger(4, "Issue with Attachment Close: " + err.Error(), false)
+			}
+			attachmentFile.FileData = w.String()
+			if a.ContentType != "" {
+				brokenstring := strings.Split(a.ContentType, ";")
+				if len(brokenstring) == 1 {
+					attachmentFile.MIMEType = a.ContentType
+				} else if len(brokenstring) > 1 {
+					attachmentFile.MIMEType = brokenstring[0]
+					//stripping ' name="'
+					if brokenstring[1][:7] == " name=\"" {
+						attachmentFile.FileName = brokenstring[1][7:len(brokenstring[1])-1]
+					}
+				}
+			}
+			if attachmentFile.FileData != "" {
+				returnStruct.Attachments = append(returnStruct.Attachments, attachmentFile)
+			}
+		}
+
+
+		//Build string to write to text file
+		fromAddress := ""
+		toAddress := ""
+		if len(m.From) > 0 {
+			fromAddress = m.From[0].Address
+		}
+		if len(m.To) > 0 {
+			toAddress = m.To[0].Address
+		}
+		bodyText := ""
+		if m.TextBody != "" {
+			bodyText = m.TextBody
+		} else {
+			bodyText = m.HTMLBody
+		}
+		RFCHeader := processSWMHeader(m.Header)
+		//fmt.Println(RFCHeader)
+		returnStruct.Subject = "Subject: " + m.Subject
+//		returnStruct.Content = "RFC Header: " + strings.Replace(m.Header, "\n", "\r\n", -1) + "\r\n" + strings.Repeat("-", 50) + "\r\n"
+		returnStruct.Content = "RFC Header: " + RFCHeader + "\r\n" + strings.Repeat("-", 50) + "\r\n"
+		returnStruct.Content = returnStruct.Content + "From: " + fromAddress + "\r\n"
+		returnStruct.Content = returnStruct.Content + "To: " + toAddress + "\r\n"
+		if !m.Date.IsZero() {
+			returnStruct.Content = returnStruct.Content + "Sent: " + m.Date.Format("Mon Jan 02 15:04:05 -0700 2006") + "\r\n"
+		}
+		returnStruct.Content = returnStruct.Content + returnStruct.Subject + "\r\n"
+		returnStruct.Content = returnStruct.Content + strings.Repeat("-", 50) + "\r\n"
+		returnStruct.Content = returnStruct.Content + strings.Replace(bodyText, "\n", "\r\n", -1)
+		
+//	fmt.Println(returnStruct)	
+		return returnStruct, true
+
+	} else {
+		logger(4, "More than one file in swm zip", false)
+		return returnStruct, false
+	}
+
+}
+
+func processSWMHeader(header mail.Header) string {
+	message := ""
+	for k, values := range header {
+		//if len(v) > 0 message += fmt.Sprintf("%s: %s\r\n", k, v)
+		for _, v := range values {
+			message += fmt.Sprintf("%s: %s\r\n", k, v)
+		}
+	}
+	return message
+}
+
 
 //addFileContent - reads the file attachment from Supportworks, attach to request and update content location
 func addFileContent(entityName string, fileRecord fileAssocStruct, espXmlmc *apiLib.XmlmcInstStruct) bool {
