@@ -537,6 +537,9 @@ func addFileContent(entityName string, fileRecord fileAssocStruct, espXmlmc *api
 		espXmlmc.CloseElement("primaryEntityData")
 
 		var XMLSTRING = espXmlmc.GetParam()
+		if configDebug {
+			logger(1, "entityAddRecord::RequestHistoricUpdateAttachments:"+XMLSTRING, false)
+		}
 
 		XMLHistAtt, xmlmcErr := espXmlmc.Invoke("data", "entityAddRecord")
 		if xmlmcErr != nil {
@@ -563,7 +566,7 @@ func addFileContent(entityName string, fileRecord fileAssocStruct, espXmlmc *api
 			return false
 		}
 		if configDebug {
-			logger(1, "Historic Update File Attactment Record Insertion Success ["+useFileName+"] ["+fileRecord.SmCallRef+"]", false)
+			logger(1, "Historic Update File Attachment Record Insertion Success ["+useFileName+"] ["+fileRecord.SmCallRef+"]", false)
 		}
 		attPriKey = xmlRespon.HistFileID
 	}
@@ -579,6 +582,9 @@ func addFileContent(entityName string, fileRecord fileAssocStruct, espXmlmc *api
 	espXmlmc.CloseElement("localFile")
 	espXmlmc.SetParam("overwrite", "true")
 	var XMLSTRINGDATA = espXmlmc.GetParam()
+	if configDebug {
+		logger(1, "entityAttachFile:"+XMLSTRINGDATA, false)
+	}
 	XMLAttach, xmlmcErr := espXmlmc.Invoke("data", "entityAttachFile")
 	if xmlmcErr != nil {
 		logger(4, "Could not add Attachment File Data for ["+useFileName+"] ["+fileRecord.SmCallRef+"]: "+xmlmcErr.Error(), false)
@@ -616,6 +622,10 @@ func addFileContent(entityName string, fileRecord fileAssocStruct, espXmlmc *api
 				espXmlmc.CloseElement("record")
 				espXmlmc.CloseElement("primaryEntityData")
 				XMLSTRINGDATA = espXmlmc.GetParam()
+				if configDebug {
+					logger(1, "entityAddRecord::RequestAttachments:"+XMLSTRINGDATA, false)
+				}
+
 				XMLContentLoc, xmlmcErrContent := espXmlmc.Invoke("data", "entityAddRecord")
 				if xmlmcErrContent != nil {
 					logger(4, "Could not update request ["+fileRecord.SmCallRef+"] with attachment ["+useFileName+"]: "+xmlmcErrContent.Error(), false)

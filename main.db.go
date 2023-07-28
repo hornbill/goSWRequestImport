@@ -71,8 +71,15 @@ func buildConnectionString(strDataSource string) string {
 			logger(4, "System Database configuration not set.", true)
 			return ""
 		}
-		connectString = "tcp:" + swImportConf.SWServerAddress + ":5002"
-		connectString = connectString + "*sw_systemdb/" + swImportConf.SWSystemDBConf.UserName + "/" + swImportConf.SWSystemDBConf.Password
+		if swImportConf.SWSystemDBConf.Driver == "mysql" {
+			connectString = swImportConf.SWSystemDBConf.UserName + ":" + swImportConf.SWSystemDBConf.Password
+			connectString = connectString + "@tcp(" + swImportConf.SWServerAddress + ":"
+			connectString = connectString + "5002"
+			connectString = connectString + ")/sw_systemdb"
+		} else {
+			connectString = "tcp:" + swImportConf.SWServerAddress + ":5002"
+			connectString = connectString + "*sw_systemdb/" + swImportConf.SWSystemDBConf.UserName + "/" + swImportConf.SWSystemDBConf.Password
+		}
 
 	}
 	return connectString

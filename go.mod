@@ -19,6 +19,7 @@ require (
 	github.com/mattn/go-sqlite3 v1.14.7 // indirect
 	github.com/olekukonko/ts v0.0.0-20171002115256-78ecb04241c0 // indirect
 	github.com/tcnksm/go-latest v0.0.0-20170313132115-e3007ae9052e
+	github.com/vraycc/go-parsemail v0.0.0-20221110135954-331ae329fca6 // indirect
 	golang.org/x/crypto v0.0.0-20210616213533-5ff15b29337e // indirect
 	golang.org/x/net v0.0.0-20210614182718-04defd469f4e // indirect
 )

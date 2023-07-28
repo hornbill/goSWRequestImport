@@ -1,5 +1,11 @@
 # CHANGELOG
 
+## 1.22.0 (July 28th, 2023)
+
+### Feature/Fix
+
+- Fixed database connection issue for connecting to System/Cache DB on CS > 6.
+
 ## 1.15.0 (January 31st, 2023)
 
 ### Feature/Fix
