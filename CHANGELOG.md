@@ -6,6 +6,12 @@
 
 - Fixed database connection issue for connecting to System/Cache DB on CS > 6.
 
+## 1.21.0 (February 22nd 2023)
+
+Change:
+
+- Complied with latest Go binaries because of security advisory.
+
 ## 1.15.0 (January 31st, 2023)
 
 ### Feature/Fix

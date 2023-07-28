@@ -81,7 +81,7 @@ type counterTypeStruct struct {
 	filesAttached    int
 }
 
-//----- Config Data Structs
+// ----- Config Data Structs
 type swImportConfStruct struct {
 	HBConf                    hbConfStruct //Hornbill Instance connection details
 	SWServerAddress           string
@@ -143,7 +143,7 @@ type xmlmcResponse struct {
 	State        stateStruct `xml:"state"`
 }
 
-//----- Shared Structs -----
+// ----- Shared Structs -----
 type stateStruct struct {
 	Code     string `xml:"code"`
 	ErrorRet string `xml:"error"`
@@ -157,7 +157,7 @@ type xmlmcSysSettingResponse struct {
 	Setting      string      `xml:"params>option>value"`
 }
 
-//----- Request Logged Structs
+// ----- Request Logged Structs
 type xmlmcRequestResponseStruct struct {
 	MethodResult string      `xml:"status,attr"`
 	RequestID    string      `xml:"params>primaryEntityData>record>h_pk_reference"`
@@ -171,7 +171,7 @@ type xmlmcBPMSpawnedStruct struct {
 	State        stateStruct `xml:"state"`
 }
 
-//----- Site Structs
+// ----- Site Structs
 type siteListStruct struct {
 	SiteName string
 	SiteID   int
@@ -184,7 +184,7 @@ type xmlmcSiteListResponse struct {
 	State        stateStruct `xml:"state"`
 }
 
-//----- Priority Structs
+// ----- Priority Structs
 type priorityListStruct struct {
 	PriorityName string
 	PriorityID   int
@@ -196,7 +196,7 @@ type xmlmcPriorityListResponse struct {
 	State        stateStruct `xml:"state"`
 }
 
-//----- Service Structs
+// ----- Service Structs
 type serviceListStruct struct {
 	ServiceName          string
 	ServiceID            int
@@ -220,7 +220,7 @@ type xmlmcServiceListResponse struct {
 	State         stateStruct `xml:"state"`
 }
 
-//----- Team Structs
+// ----- Team Structs
 type groupListStruct struct {
 	Name string
 	ID   string
@@ -239,7 +239,7 @@ type xmlmcTeamListResponse struct {
 	State        stateStruct `xml:"state"`
 }
 
-//----- Category Structs
+// ----- Category Structs
 type categoryListStruct struct {
 	CategoryCode string
 	CategoryID   string
@@ -252,7 +252,7 @@ type xmlmcCategoryListResponse struct {
 	State        stateStruct `xml:"state"`
 }
 
-//----- Analyst Structs
+// ----- Analyst Structs
 type userListStruct struct {
 	UserID  string
 	Name    string
@@ -267,7 +267,7 @@ type xmlmcUserListResponse struct {
 	State        stateStruct `xml:"state"`
 }
 
-//----- Customer Structs
+// ----- Customer Structs
 type customerListStruct struct {
 	CustomerHornbillID string
 	CustomerID         string
@@ -297,13 +297,13 @@ type xmlmcContactListResponse struct {
 	State              stateStruct `xml:"state"`
 }
 
-//----- Associated Record Struct
+// ----- Associated Record Struct
 type reqRelStruct struct {
 	MasterRef string `db:"parentRequest"`
 	SlaveRef  string `db:"childRequest"`
 }
 
-//----- File Attachment Structs
+// ----- File Attachment Structs
 type xmlmcAttachmentResponse struct {
 	MethodResult    string      `xml:"status,attr"`
 	ContentLocation string      `xml:"params>contentLocation"`
@@ -311,7 +311,7 @@ type xmlmcAttachmentResponse struct {
 	HistFileID      string      `xml:"params>primaryEntityData>record>h_pk_fileid"`
 }
 
-//----- Email Attachment Structs
+// ----- Email Attachment Structs
 type xmlmcEmailAttachmentResponse struct {
 	MethodResult    string             `xml:"status,attr"`
 	Recipients      []recipientStruct  `xml:"params>recipient"`
@@ -344,7 +344,7 @@ type swmStruct struct {
 	Attachments []fileAttachStruct
 }
 
-//----- File Attachment Struct
+// ----- File Attachment Struct
 type fileAssocStruct struct {
 	ImportRef       int
 	SmCallRef       string
@@ -365,14 +365,14 @@ type fileAssocStruct struct {
 	EmailAttachment fileAttachStruct
 }
 
-//RequestDetails struct for chan
+// RequestDetails struct for chan
 type RequestDetails struct {
 	CallClass string
 	CallMap   map[string]interface{}
 	SwCallID  string
 }
 
-//RequestReferences struct for chan
+// RequestReferences struct for chan
 type RequestReferences struct {
 	SmCallID string
 	SwCallID string
