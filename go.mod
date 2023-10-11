@@ -12,7 +12,10 @@ require (
 	github.com/hornbill/pb v0.0.0-20151205101406-5d91ad42e9c1
 	github.com/hornbill/sqlx v0.0.0-20160105113732-0c4aca8610c8
 	github.com/tcnksm/go-latest v0.0.0-20170313132115-e3007ae9052e
-	github.com/vraycc/go-parsemail v0.0.0-20221110135954-331ae329fca6 // indirect
+	github.com/vraycc/go-parsemail v0.0.0-20221110135954-331ae329fca6
+)
+
+require (
 	github.com/go-sql-driver/mysql v1.7.0 // indirect
 	github.com/google/go-github v17.0.0+incompatible // indirect
 	github.com/google/go-querystring v1.1.0 // indirect
@@ -22,7 +25,7 @@ require (
 	github.com/mattn/go-isatty v0.0.17 // indirect
 	github.com/mattn/go-sqlite3 v1.14.16 // indirect
 	github.com/olekukonko/ts v0.0.0-20171002115256-78ecb04241c0 // indirect
-	golang.org/x/crypto v0.6.0 // indirect
-	golang.org/x/net v0.7.0 // indirect
-	golang.org/x/sys v0.5.0 // indirect
+	golang.org/x/crypto v0.14.0 // indirect
+	golang.org/x/net v0.17.0 // indirect
+	golang.org/x/sys v0.13.0 // indirect
 )
