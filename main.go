@@ -100,14 +100,6 @@ func main() {
 	connStrSysDB = buildConnectionString("cache")
 	connStrAppDB = buildConnectionString("app")
 
-	var dberr error
-	dbsys, dberr = sqlx.Open(cacheDBDriver, connStrSysDB)
-	if dberr != nil {
-		logger(4, "Could not open cache DB connection"+dberr.Error(), true)
-		return
-	}
-	defer dbsys.Close()
-
 	var db2err error
 	//fmt.Println(connStrAppDB)
 	dbapp, db2err = sqlx.Open(appDBDriver, connStrAppDB)
@@ -116,6 +108,18 @@ func main() {
 		return
 	}
 	defer dbapp.Close()
+
+	if swImportConf.SWSystemDBConf.Driver == "mysql" && swImportConf.SWSystemDBConf.Driver == swImportConf.SWAppDBConf.Driver {
+		dbsys = dbapp
+	} else {
+		var dberr error
+		dbsys, dberr = sqlx.Open(cacheDBDriver, connStrSysDB)
+		if dberr != nil {
+			logger(4, "Could not open cache DB connection"+dberr.Error(), true)
+			return
+		}
+		defer dbsys.Close()
+	}
 
 	err = loadOrgs()
 	if err != nil {

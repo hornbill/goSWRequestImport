@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"encoding/xml"
 	"fmt"
-	"html"
 	"strconv"
 	"strings"
 
@@ -76,7 +75,6 @@ func applyHistoricalUpdates(request RequestReferences, espXmlmc *apiLib.XmlmcIns
 			diaryText := ""
 			if diaryEntry["updatetxt"] != nil {
 				diaryText = fmt.Sprintf("%+s", diaryEntry["updatetxt"])
-				diaryText = html.EscapeString(diaryText)
 			}
 
 			diaryIndex := ""

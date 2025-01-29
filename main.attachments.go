@@ -142,8 +142,11 @@ func fileAttachmentData(swRequest, smRequest string) []fileAssocStruct {
 
 	//build query
 	sqlFileQuery := "SELECT fileid, callref, dataid, updateid, compressed, sizeu, sizec, filename, addedby, timeadded, filetime"
-	sqlFileQuery = sqlFileQuery + " FROM system_cfastore WHERE callref = " + intSwCallRef
-
+	if swImportConf.SWSystemDBConf.Driver == "mysql" && swImportConf.SWSystemDBConf.Driver == swImportConf.SWAppDBConf.Driver {
+		sqlFileQuery = sqlFileQuery + " FROM sw_systemdb.system_cfastore WHERE callref = " + intSwCallRef
+	} else {
+		sqlFileQuery = sqlFileQuery + " FROM system_cfastore WHERE callref = " + intSwCallRef
+	}
 	//Run Query
 	rows, err := dbsys.Queryx(sqlFileQuery)
 	if err != nil {
@@ -662,10 +665,8 @@ func addFileContent(entityName string, fileRecord fileAssocStruct, espXmlmc *api
 //getSubFolderName - takes SW call reference, passes back the folder name where the calls attachments are stored
 func getSubFolderName(fileCallRef string) string {
 	paddedRef := padCallRef(fileCallRef, "", 7)
-	folderName := ""
-	for i := 0; i < 4; i++ {
-		folderName = folderName + string(paddedRef[i])
-	}
+	iStop := len(paddedRef) - 3 // grouped by thousands
+	folderName := paddedRef[0:iStop]
 	return folderName
 }
 

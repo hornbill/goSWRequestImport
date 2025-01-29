@@ -1,4 +1,4 @@
-module goSWRequstImport
+module goSWRequestImport
 
 go 1.19
 

@@ -1,5 +1,12 @@
 # CHANGELOG
 
+## 1.22.1 (January 29th, 2025)
+
+### Feature/Fix
+
+- Fixed database connection issue for connecting to MariaDB System/Cache DB on CS > 6.
+- Fixed issue with Historic Updates having extraneous escaping
+
 ## 1.22.0 (July 28th, 2023)
 
 ### Feature/Fix
@@ -10,7 +17,7 @@
 
 Change:
 
-- Complied with latest Go binaries because of security advisory.
+- Compiled with latest Go binaries because of security advisory.
 
 ## 1.15.0 (January 31st, 2023)
 
