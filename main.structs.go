@@ -87,9 +87,11 @@ type swImportConfStruct struct {
 	SWServerAddress           string
 	AttachmentRoot            string
 	CustomerType              string
+	IDField                   string
 	SMProfileCodeSeperator    string
 	RelatedRequestQuery       string
 	CallDiaryQuery            string
+	AttachmentQuery           string
 	SWSystemDBConf            sysDBConfStruct //Cache Data (sw_systemdb) connection details
 	SWAppDBConf               appDBConfStruct //App Data (swdata) connection details
 	RequestTypesToImport      []swCallConfStruct
@@ -115,6 +117,10 @@ type sysDBConfStruct struct {
 	Driver   string
 	UserName string
 	Password string
+	ConnectionString string
+	Port             int
+	Database         string
+	Encrypt          bool
 }
 type appDBConfStruct struct {
 	Driver           string
@@ -356,12 +362,15 @@ type fileAssocStruct struct {
 	SizeU           float64 `db:"sizeu"`
 	SizeC           float64 `db:"sizec"`
 	FileName        string  `db:"filename"`
+	
+	FilePath        string  `db:"filepath"`
+	Description     string  `db:"description"`
+
 	AddedBy         string  `db:"addedby"`
 	TimeAdded       string  `db:"timeadded"`
 	FileTime        string  `db:"filetime"`
 	FileData        string
 	Extension       string
-	Description     string
 	EmailAttachment fileAttachStruct
 }
 

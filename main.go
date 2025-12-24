@@ -6,14 +6,13 @@ import (
 	"strings"
 	"time"
 
-	"github.com/tcnksm/go-latest" //-- For Version checking
-
 	"github.com/hornbill/sqlx"
 	//SQL Drivers
 	_ "github.com/alexbrainman/odbc"
 	_ "github.com/hornbill/go-mssqldb" //Microsoft SQL Server driver - v2005+
 	_ "github.com/hornbill/mysql"      //MySQL v4.1 to v5.x and MariaDB driver
 	_ "github.com/hornbill/mysql320"   //MySQL v3.2.0 to v5 driver - Provides SWSQL (MySQL 4.0.16) support - originally weave-lab
+	_ "github.com/lib/pq"
 )
 
 // main package
@@ -32,7 +31,6 @@ func main() {
 	}
 	//-- Output to CLI and Log
 	logger(1, "---- Supportworks Call Import Utility V"+fmt.Sprintf("%v", version)+" ----", true)
-	checkVersion()
 	logger(1, "Flag - Config File "+configFileName, true)
 	logger(1, "Flag - Dry Run "+fmt.Sprintf("%v", configDryRun), true)
 	logger(1, "Flag - Concurrent Requests "+fmt.Sprintf("%v", configMaxRoutines), true)
@@ -66,7 +64,7 @@ func main() {
 	}
 	if swImportConf.SWAppDBConf.Driver == "swsql" {
 		appDBDriver = "mysql320"
-	} else if swImportConf.SWAppDBConf.Driver == "mysql" || swImportConf.SWAppDBConf.Driver == "mssql" || swImportConf.SWAppDBConf.Driver == "mysql320" || swImportConf.SWAppDBConf.Driver == "odbc" || swImportConf.SWAppDBConf.Driver == "ODBC" {
+	} else if swImportConf.SWAppDBConf.Driver == "mysql" || swImportConf.SWAppDBConf.Driver == "mssql" || swImportConf.SWAppDBConf.Driver == "mysql320" || swImportConf.SWAppDBConf.Driver == "odbc" || swImportConf.SWAppDBConf.Driver == "ODBC" || swImportConf.SWAppDBConf.Driver == "postgres" {
 		appDBDriver = swImportConf.SWAppDBConf.Driver
 	} else {
 		logger(4, "The SQL driver ("+swImportConf.SWAppDBConf.Driver+") for the Supportworks Application Database specified in the configuration file is not valid.", true)
@@ -79,7 +77,7 @@ func main() {
 	}
 	if swImportConf.SWSystemDBConf.Driver == "swsql" {
 		cacheDBDriver = "mysql320"
-	} else if swImportConf.SWSystemDBConf.Driver == "mysql" || swImportConf.SWSystemDBConf.Driver == "mysql320" {
+	} else if swImportConf.SWSystemDBConf.Driver == "mysql" || swImportConf.SWSystemDBConf.Driver == "mysql320" || swImportConf.SWSystemDBConf.Driver == "postgres" {
 		cacheDBDriver = swImportConf.SWSystemDBConf.Driver
 	} else {
 		logger(4, "The SQL driver ("+swImportConf.SWSystemDBConf.Driver+") for the Supportworks System Database specified in the configuration file is not valid.", true)
@@ -101,7 +99,8 @@ func main() {
 	connStrAppDB = buildConnectionString("app")
 
 	var db2err error
-	//fmt.Println(connStrAppDB)
+	//fmt.Println("SYS:" + connStrSysDB)
+	//fmt.Println("APP:" + connStrAppDB)
 	dbapp, db2err = sqlx.Open(appDBDriver, connStrAppDB)
 	if db2err != nil {
 		logger(4, "Could not open app DB connection"+db2err.Error(), true)
@@ -109,7 +108,7 @@ func main() {
 	}
 	defer dbapp.Close()
 
-	if swImportConf.SWSystemDBConf.Driver == "mysql" && swImportConf.SWSystemDBConf.Driver == swImportConf.SWAppDBConf.Driver {
+	if (swImportConf.SWSystemDBConf.Driver == "mysql" || swImportConf.SWSystemDBConf.Driver == "postgres") && swImportConf.SWSystemDBConf.Driver == swImportConf.SWAppDBConf.Driver {
 		dbsys = dbapp
 	} else {
 		var dberr error
@@ -137,7 +136,7 @@ func main() {
 
 	if len(arrCallsLogged) > 0 {
 		//Process associations
-		processCallAssociations()
+		//processCallAssociations()
 		//Add file attachments to requests
 		processAttachments()
 	}
@@ -157,19 +156,3 @@ func main() {
 
 }
 
-//-- Check Latest
-func checkVersion() {
-	githubTag := &latest.GithubTag{
-		Owner:      "hornbill",
-		Repository: repo,
-	}
-
-	res, err := latest.Check(githubTag, version)
-	if err != nil {
-		logger(4, "Unable to check utility version against Github repository: "+err.Error(), true)
-		return
-	}
-	if res.Outdated {
-		logger(5, version+" is not latest, you should upgrade to "+res.Current+" by downloading the latest package Here https://github.com/hornbill/"+repo+"/releases/tag/v"+res.Current, true)
-	}
-}

@@ -36,7 +36,7 @@ func processCallData() {
 
 		for _, callRecord := range arrCallDetailsMaps {
 			callRecordArr := callRecord
-			callRecordCallref := callRecord["callref"]
+			callRecordCallref := callRecord[swImportConf.IDField]
 
 			mutexBar.Lock()
 			bar.Increment()
@@ -466,7 +466,7 @@ func logNewCall(jobs chan RequestDetails, wg *sync.WaitGroup, espXmlmc *apiLib.X
 
 				//Now update the request to create the activity stream
 				espXmlmc.SetParam("socialObjectRef", "urn:sys:entity:"+appServiceManager+":Requests:"+strNewCallRef)
-				espXmlmc.SetParam("content", "Request imported from Supportworks")
+				espXmlmc.SetParam("content", "Request imported from ManageEngine")
 				espXmlmc.SetParam("visibility", "public")
 				espXmlmc.SetParam("type", "Logged")
 				if configDebug {

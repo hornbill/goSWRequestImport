@@ -49,6 +49,16 @@ func buildConnectionString(strDataSource string) string {
 			connectString = "tcp:" + swImportConf.SWAppDBConf.Server + ":" + dbPortSetting
 			connectString = connectString + "*" + swImportConf.SWAppDBConf.Database + "/" + swImportConf.SWAppDBConf.UserName + "/" + swImportConf.SWAppDBConf.Password
 
+		case "postgres":
+			connectString = fmt.Sprintf("host=%s port=%d user=%s password=%s dbname=%s", swImportConf.SWServerAddress, swImportConf.SWAppDBConf.Port, swImportConf.SWAppDBConf.UserName, swImportConf.SWAppDBConf.Password, swImportConf.SWAppDBConf.Database)
+			if !swImportConf.SWAppDBConf.Encrypt {
+				connectString = connectString + " sslmode=disable"
+			}
+
+			//dbPortSetting := strconv.Itoa(swImportConf.SWAppDBConf.Port)
+			//connectString = "tcp:" + swImportConf.SWAppDBConf.Server + ":" + dbPortSetting
+			//connectString = connectString + "*" + swImportConf.SWAppDBConf.Database + "/" + swImportConf.SWAppDBConf.UserName + "/" + swImportConf.SWAppDBConf.Password
+
 		case "odbc":
 			//connectString = swImportConf.SWAppDBConf.UserName +"/"+swImportConf.SWAppDBConf.Password+"@"+swImportConf.SWAppDBConf.Server+":"+strconv.Itoa(swImportConf.SWAppDBConf.Port)+"/"+swImportConf.SWAppDBConf.Database
 			connectString = "DSN=" + swImportConf.SWAppDBConf.Database + ";UID=" + swImportConf.SWAppDBConf.UserName + ";PWD=" + swImportConf.SWAppDBConf.Password
@@ -76,6 +86,11 @@ func buildConnectionString(strDataSource string) string {
 			connectString = connectString + "@tcp(" + swImportConf.SWServerAddress + ":"
 			connectString = connectString + "5002"
 			connectString = connectString + ")/sw_systemdb"
+		} else if swImportConf.SWSystemDBConf.Driver == "postgres" {
+			connectString := fmt.Sprintf("host=%s port=%d user=%s password=%s dbname=%s sslmode=disable", swImportConf.SWServerAddress, swImportConf.SWSystemDBConf.Port, swImportConf.SWSystemDBConf.UserName, swImportConf.SWSystemDBConf.Password, swImportConf.SWSystemDBConf.Database)
+			if !swImportConf.SWSystemDBConf.Encrypt {
+				connectString = connectString + " sslmode=disable"
+			}
 		} else {
 			connectString = "tcp:" + swImportConf.SWServerAddress + ":5002"
 			connectString = connectString + "*sw_systemdb/" + swImportConf.SWSystemDBConf.UserName + "/" + swImportConf.SWSystemDBConf.Password
@@ -159,7 +174,8 @@ func getFieldValue(v string, u map[string]interface{}) string {
 		valFieldMap = strings.Replace(val, "[", "", 1)
 		valFieldMap = strings.Replace(valFieldMap, "]", "", 1)
 		if valFieldMap == "oldCallRef" {
-			valFieldMap = "h_formattedcallref"
+			
+			valFieldMap = swImportConf.IDField
 			if u[valFieldMap] != nil {
 
 				if valField, ok := u[valFieldMap].(int64); ok {
@@ -169,26 +185,12 @@ func getFieldValue(v string, u map[string]interface{}) string {
 				}
 
 				if valFieldMap != "<nil>" {
-					fieldMap = strings.Replace(fieldMap, val, valFieldMap, 1)
+					fieldMap = strings.Replace(fieldMap, val, padCallRef(valFieldMap, "F", 7), 1)
 				}
-
 			} else {
-				valFieldMap = "callref"
-				if u[valFieldMap] != nil {
-
-					if valField, ok := u[valFieldMap].(int64); ok {
-						valFieldMap = strconv.FormatInt(valField, 10)
-					} else {
-						valFieldMap = fmt.Sprintf("%+s", u[valFieldMap])
-					}
-
-					if valFieldMap != "<nil>" {
-						fieldMap = strings.Replace(fieldMap, val, padCallRef(valFieldMap, "F", 7), 1)
-					}
-				} else {
-					fieldMap = strings.Replace(fieldMap, val, "", 1)
-				}
+				fieldMap = strings.Replace(fieldMap, val, "", 1)
 			}
+			
 		} else {
 			if u[valFieldMap] != nil {
 
