@@ -1,14 +1,13 @@
 {
   "HBConf": {
-    "InstanceID": "your instance ID goes here",
-    "UserName": "Your administrator account ID goes here",
-    "Password": "Your administrator account password goes here"
+    "InstanceID": "...",
+    "APIKey": "..."
   },
   "SWServerAddress": "127.0.0.1",
-  "AttachmentRoot": "E:/Program Files/Hornbill/Supportworks Server/data/cfa_store",
+  "AttachmentRoot": "C:\\abc\\def\\def",
   "SWSystemDBConf": {
     "Driver": "postgres",
-    "Server": "10.0.2.15",
+    "Server": "127.0.0.1",
     "Database": "test_calls",
     "UserName": "postgres",
     "Password": "Alph4bet^12p",
@@ -17,7 +16,7 @@
   },
   "SWAppDBConf": {
     "Driver": "postgres",
-    "Server": "10.0.2.15",
+    "Server": "127.0.0.1",
     "Database": "test_calls",
     "UserName": "postgres",
     "Password": "Alph4bet^12p",
@@ -29,7 +28,7 @@
   "RelatedRequestQuery": "",
   "IDField": "id",
   "CallDiaryQuery": "SELECT updatetxt FROM diary WHERE req = [sourceref]",
-  "AttachmentQuery": "SELECT id AS fileid, filepath as filename, filepath, abc as description FROM attach WHERE req = [sourceref]",
+  "AttachmentQuery": "SELECT id AS fileid, SUBSTRING(filepath, '[^\\\\]*$') as filename, filepath, 123456789 as timeadded, abc as description FROM attach WHERE req = [sourceref]",
   "RequestTypesToImport": [{
       "Description": "This object configures the importing of Incidents",
       "Import": true,

@@ -47,19 +47,21 @@ func processFileAttachments(swCallRef, smCallRef string, espXmlmc *apiLib.XmlmcI
 		fileRecord.SmCallRef = smCallRef
 		entityRequest = "Requests"
 
-		updateID, _ := strconv.Atoi(fileRecord.UpdateID)
-		updateID = updateID - 1
-		fileRecord.UpdateID = strconv.Itoa(updateID)
+//		updateID, _ := strconv.Atoi(fileRecord.UpdateID)
+//		updateID = updateID - 1
+//		fileRecord.UpdateID = strconv.Itoa(updateID)
 
 		fileRecord.Extension = filepath.Ext(fileRecord.FileName)
 
 		var err error
 		fileRecord.FileData, err = getFileEncoded(fileRecord)
 		if err == nil {
-			if (fileRecord.Description == "") {
-				fileRecord.Description = "Originally added by " + fileRecord.AddedBy
-			} else {
-				fileRecord.Description = fileRecord.Description + "\nOriginally added by " + fileRecord.AddedBy
+			if (fileRecord.AddedBy != ""){
+				if (fileRecord.Description == "") {
+					fileRecord.Description = "Originally added by " + fileRecord.AddedBy
+				} else {
+					fileRecord.Description = fileRecord.Description + "\nOriginally added by " + fileRecord.AddedBy
+				}
 			}
 			addFileContent(entityRequest, fileRecord, espXmlmc)
 		}

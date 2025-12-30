@@ -12,7 +12,7 @@ import (
 )
 
 const (
-	version           = "1.22.1"
+	version           = "1.22.1ME"
 	repo              = "goSWRequestImport"
 	appServiceManager = "com.hornbill.servicemanager"
 )
