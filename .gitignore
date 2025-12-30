@@ -1,0 +1,11 @@
+.vscode/
+builds/
+release/
+log/
+.github/.DS_Store
+.DS_Store
+import.cfg
+dev*.json
+*.bak
+/debugDataSource
+*.exe
