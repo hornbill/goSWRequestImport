@@ -12,7 +12,7 @@ import (
 )
 
 const (
-	version           = "1.22.1"
+	version           = "1.22.2"
 	repo              = "goSWRequestImport"
 	appServiceManager = "com.hornbill.servicemanager"
 )
@@ -67,6 +67,7 @@ var (
 	reqPrefix              string
 	maxGoroutines          = 1
 	boolProcessAttachments bool
+	boolNoAttachments bool
 	dbapp                  *sqlx.DB
 	dbsys                  *sqlx.DB
 )

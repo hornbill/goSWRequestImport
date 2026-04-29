@@ -1,5 +1,11 @@
 # CHANGELOG
 
+## 1.22.2 (April 29th, 2026)
+
+### Feature
+
+- Addition of -NoAttachments command line parameter to skip attachments being added to request (connection to Cache DB is still required, just not used).
+
 ## 1.22.1 (January 29th, 2025)
 
 ### Feature/Fix

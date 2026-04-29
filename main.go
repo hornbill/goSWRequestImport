@@ -139,7 +139,9 @@ func main() {
 		//Process associations
 		processCallAssociations()
 		//Add file attachments to requests
-		processAttachments()
+		if (!boolNoAttachments){
+			processAttachments()
+		}
 	}
 
 	//-- End output
